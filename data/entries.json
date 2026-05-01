@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "userId": "107570700017090037395",
+    "description": "Test",
+    "date": "2026-05-01",
+    "startTime": "15:23",
+    "endTime": "15:23",
+    "id": "109725dc-35ec-433c-84d8-f19a607d1b17",
+    "durationSeconds": 0
+  }
+]
