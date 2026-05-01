@@ -1,7 +1,4 @@
-import { promises as fs } from 'fs';
-import path from 'path';
-
-const ENTRIES_FILE = path.join(process.cwd(), 'data', 'entries.json');
+import { supabase } from './supabase';
 
 export interface TimeEntry {
   id: string;
@@ -15,11 +12,25 @@ export interface TimeEntry {
 
 export async function getManualEntries(userId: string): Promise<TimeEntry[]> {
   try {
-    const data = await fs.readFile(ENTRIES_FILE, 'utf-8');
-    const allEntries = JSON.parse(data);
-    return allEntries.filter((e: TimeEntry) => e.userId === userId);
+    const { data, error } = await supabase
+      .from('entries')
+      .select('*')
+      .eq('user_id', userId)
+      .order('date', { ascending: false });
+
+    if (error) throw error;
+    
+    return (data || []).map(e => ({
+      id: e.id,
+      userId: e.user_id,
+      description: e.description,
+      date: e.date,
+      startTime: e.start_time.substring(0, 5),
+      endTime: e.end_time.substring(0, 5),
+      durationSeconds: e.duration_seconds
+    }));
   } catch (e) {
-    await fs.mkdir(path.dirname(ENTRIES_FILE), { recursive: true }).catch(() => {});
+    console.error('Error fetching entries:', e);
     return [];
   }
 }
@@ -28,38 +39,35 @@ export async function addManualEntry(entry: Omit<TimeEntry, 'id' | 'durationSeco
   const start = new Date(`${entry.date}T${entry.startTime}`);
   const end = new Date(`${entry.date}T${entry.endTime}`);
   
-  // Basic validation: end must be after start
   if (end < start) throw new Error('End time must be after start time');
 
   const durationSeconds = (end.getTime() - start.getTime()) / 1000;
-  const newEntry: TimeEntry = {
-    ...entry,
-    id: crypto.randomUUID(),
-    durationSeconds
-  };
+  
+  const { data, error } = await supabase
+    .from('entries')
+    .insert({
+      user_id: entry.userId,
+      description: entry.description,
+      date: entry.date,
+      start_time: entry.startTime,
+      end_time: entry.endTime,
+      duration_seconds: durationSeconds
+    })
+    .select()
+    .single();
 
-  const entries = await getAllEntries();
-  entries.push(newEntry);
-  await fs.writeFile(ENTRIES_FILE, JSON.stringify(entries, null, 2));
-  return newEntry;
-}
-
-async function getAllEntries(): Promise<TimeEntry[]> {
-  try {
-    const data = await fs.readFile(ENTRIES_FILE, 'utf-8');
-    return JSON.parse(data);
-  } catch {
-    return [];
-  }
+  if (error) throw error;
+  return data;
 }
 
 export async function deleteManualEntry(id: string) {
-  const entries = await getAllEntries();
-  const filtered = entries.filter(e => e.id !== id);
-  await fs.writeFile(ENTRIES_FILE, JSON.stringify(filtered, null, 2));
-}
+  const { error } = await supabase
+    .from('entries')
+    .delete()
+    .eq('id', id);
 
-const TIMER_FILE = path.join(process.cwd(), 'data', 'active_timer.json');
+  if (error) throw error;
+}
 
 export interface ActiveTimer {
   userId: string;
@@ -69,39 +77,54 @@ export interface ActiveTimer {
 
 export async function getActiveTimer(userId: string): Promise<ActiveTimer | null> {
   try {
-    const data = await fs.readFile(TIMER_FILE, 'utf-8');
-    const timers = JSON.parse(data);
-    return timers.find((t: ActiveTimer) => t.userId === userId) || null;
+    const { data, error } = await supabase
+      .from('active_timers')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !data) return null;
+
+    return {
+      userId: data.user_id,
+      startTime: data.start_time,
+      description: data.description
+    };
   } catch {
     return null;
   }
 }
 
 export async function startTimer(userId: string, description: string = '') {
-  const timers = await getAllTimers();
-  const index = timers.findIndex(t => t.userId === userId);
-  const newTimer = { userId, description, startTime: new Date().toISOString() };
-  
-  if (index !== -1) timers[index] = newTimer;
-  else timers.push(newTimer);
-  
-  await fs.writeFile(TIMER_FILE, JSON.stringify(timers, null, 2));
-  return newTimer;
+  const { data, error } = await supabase
+    .from('active_timers')
+    .upsert({
+      user_id: userId,
+      description,
+      start_time: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
 }
 
 export async function updateTimerStart(userId: string, newStartTime: string) {
-  const timers = await getAllTimers();
-  const index = timers.findIndex(t => t.userId === userId);
-  if (index === -1) throw new Error('No active timer found');
-
-  // Convert time string (HH:mm) to a full ISO date for today
   const [h, m] = newStartTime.split(':').map(Number);
   const date = new Date();
   date.setHours(h, m, 0, 0);
 
-  timers[index].startTime = date.toISOString();
-  await fs.writeFile(TIMER_FILE, JSON.stringify(timers, null, 2));
-  return timers[index];
+  const { data, error } = await supabase
+    .from('active_timers')
+    .update({ start_time: date.toISOString() })
+    .eq('user_id', userId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
 }
 
 export async function stopTimer(userId: string, description: string) {
@@ -120,16 +143,10 @@ export async function stopTimer(userId: string, description: string) {
     endTime: now.toTimeString().substring(0, 5)
   });
 
-  const timers = await getAllTimers();
-  const filtered = timers.filter(t => t.userId !== userId);
-  await fs.writeFile(TIMER_FILE, JSON.stringify(filtered, null, 2));
-}
+  const { error } = await supabase
+    .from('active_timers')
+    .delete()
+    .eq('user_id', userId);
 
-async function getAllTimers(): Promise<ActiveTimer[]> {
-  try {
-    const data = await fs.readFile(TIMER_FILE, 'utf-8');
-    return JSON.parse(data);
-  } catch {
-    return [];
-  }
+  if (error) throw error;
 }
