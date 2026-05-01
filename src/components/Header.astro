@@ -1,0 +1,84 @@
+---
+const { user } = Astro.props;
+---
+
+<header id="sys-header">
+  <div class="header-left">
+    <div class="logo-mark">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <path d="M12 2L3 7V12C3 16.55 6.84 20.74 12 22C17.16 20.74 21 16.55 21 12V7L12 2Z" fill="url(#lg-h)"/>
+        <path d="M9 12L11 14L15 10" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <defs><linearGradient id="lg-h" x1="3" y1="2" x2="21" y2="22" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#8b5cf6"/></linearGradient></defs>
+      </svg>
+    </div>
+    <div class="logo-text">
+      <span class="logo-primary">IDRIS</span>
+      <span class="logo-sep">×</span>
+      <span class="logo-secondary">Allowance</span>
+    </div>
+  </div>
+  <div class="header-center">
+    <div class="clock-wrapper">
+      <span class="pulse-dot green"></span>
+      <span id="live-clock" class="live-clock">--:--:-- --</span>
+      <span class="clock-tz">PHT</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="user-info">
+      {user?.picture && <img class="avatar" src={user.picture} alt={user.name} width="28" height="28" />}
+      <span class="user-name">{user?.name?.split(' ')[0]}</span>
+      <a href="/api/auth/logout" class="logout-btn" title="Sign out">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><polyline points="16,17 21,12 16,7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+    </div>
+  </div>
+</header>
+
+<style>
+  #sys-header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; height: 56px;
+    background: rgba(9,10,18,0.88); backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(99,102,241,0.15);
+  }
+  .header-left { display: flex; align-items: center; gap: 10px; }
+  .logo-mark { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.3); border-radius: 8px; }
+  .logo-text { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; }
+  .logo-primary { color: #a5b4fc; font-weight: 700; letter-spacing: .08em; }
+  .logo-sep { color: rgba(255,255,255,.22); font-weight: 300; }
+  .logo-secondary { color: rgba(226,232,240,.6); font-weight: 400; }
+  .clock-wrapper { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 20px; padding: 5px 14px; }
+  .live-clock { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #e2e8f0; letter-spacing: .06em; }
+  .clock-tz { font-size: 10px; font-weight: 600; color: rgba(165,180,252,.7); letter-spacing: .1em; background: rgba(99,102,241,.15); padding: 2px 6px; border-radius: 4px; }
+  .pulse-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; animation: pdot 2s ease-in-out infinite; }
+  .green { background: #34d399; box-shadow: 0 0 7px #34d399; }
+  @keyframes pdot { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+  .user-info { display: flex; align-items: center; gap: 10px; }
+  .avatar { border-radius: 50%; border: 2px solid rgba(99,102,241,.4); }
+  .user-name { font-size: 13px; font-weight: 600; color: #a5b4fc; }
+  .logout-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 8px;
+    background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.2);
+    color: #f87171; text-decoration: none; transition: all .2s;
+  }
+  .logout-btn:hover { background: rgba(239,68,68,.2); transform: scale(1.05); }
+
+  @media (max-width: 640px) {
+    .logo-secondary, .logo-sep { display: none; }
+  }
+</style>
+
+<script>
+  function tick() {
+    const pht = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+    const h = pht.getHours(), m = String(pht.getMinutes()).padStart(2,'0'), s = String(pht.getSeconds()).padStart(2,'0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const el = document.getElementById('live-clock');
+    if (el) el.textContent = `${String(h%12||12).padStart(2,'0')}:${m}:${s} ${ampm}`;
+  }
+  tick(); setInterval(tick, 1000);
+</script>

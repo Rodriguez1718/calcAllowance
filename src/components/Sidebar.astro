@@ -1,0 +1,70 @@
+---
+const { user, activeTab } = Astro.props;
+---
+
+<aside id="sidebar">
+  <div class="sidebar-user">
+    {user.picture && <img class="sidebar-avatar" src={user.picture} alt="" width="32" height="32" />}
+    <div>
+      <div class="sidebar-name">{user.name}</div>
+      <div class="sidebar-email" title={user.email}>{user.email}</div>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <a href="/dashboard" class={`nav-item ${activeTab === 'dashboard' ? 'active-nav' : ''}`}>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/></svg>
+      <span>Dashboard</span>
+    </a>
+    <a href="/sync-logs" class={`nav-item ${activeTab === 'sync-logs' ? 'active-nav' : ''}`}>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4 4v5h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 20v-5h-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.93 15a8 8 0 1 0 .67-8.37L4 11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Sync Logs</span>
+    </a>
+    <a href="/team-metrics" class={`nav-item ${activeTab === 'team-metrics' ? 'active-nav' : ''}`}>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" stroke="currentColor" stroke-width="1.7"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      <span>DTR Sheet</span>
+    </a>
+    <a href="/settings" class={`nav-item ${activeTab === 'settings' ? 'active-nav' : ''}`}>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" stroke="currentColor" stroke-width="1.7"/></svg>
+      <span>Settings</span>
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="sidebar-version">v1.0.4-stable</div>
+  </div>
+</aside>
+
+<style>
+  #sidebar {
+    position: fixed; left: 0; top: 56px; bottom: 0; width: 220px;
+    background: rgba(10,11,22,0.88); backdrop-filter: blur(16px);
+    border-right: 1px solid rgba(99,102,241,0.12);
+    display: flex; flex-direction: column; padding: 20px 12px; gap: 6px;
+  }
+  .sidebar-user {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px; background: rgba(99,102,241,.06);
+    border: 1px solid rgba(99,102,241,.14);
+    border-radius: 10px; margin-bottom: 16px;
+  }
+  .sidebar-avatar { border-radius: 50%; border: 2px solid rgba(99,102,241,.3); }
+  .sidebar-name { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+  .sidebar-email { font-size: 10px; color: rgba(148,163,184,.55); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
+  .sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 11px; padding: 10px 12px;
+    border-radius: 8px; font-size: 13px; font-weight: 500;
+    color: rgba(148,163,184,.65); text-decoration: none;
+    cursor: pointer; transition: all .2s;
+  }
+  .nav-item:hover { background: rgba(99,102,241,.08); color: #a5b4fc; }
+  .nav-item.active-nav {
+    background: rgba(99,102,241,.14); color: #a5b4fc;
+    border: 1px solid rgba(99,102,241,.22);
+  }
+  .sidebar-footer { margin-top: auto; padding: 0 4px; }
+  .sidebar-version { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: rgba(100,116,139,.4); letter-spacing: .06em; }
+
+  @media (max-width: 640px) {
+    #sidebar { display: none; }
+  }
+</style>
