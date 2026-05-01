@@ -18,7 +18,7 @@ if (!user) {
 }
 
 // Fetch App Settings
-const settings = await getAppSettings();
+const settings = await getAppSettings(user.id);
 const isClockifySet = !!(import.meta.env.CLOCKIFY_API_KEY && import.meta.env.CLOCKIFY_WORKSPACE_ID);
 
 // Fetch data (Clockify or Manual)
@@ -112,10 +112,61 @@ if (!isUsingManual) {
       <div class="bg-grid" aria-hidden="true"></div>
       <div class="bg-glow" aria-hidden="true"></div>
 
+      {/* SETUP WIZARD MODAL */}
+      {!settings.setupComplete && (
+        <div class="setup-overlay">
+          <div class="setup-modal">
+            <div class="modal-header">
+              <div class="modal-badge">INITIAL SETUP</div>
+              <h2>Configure Your Program</h2>
+              <p>Welcome! Let's set up your internship details to get your dashboard ready.</p>
+            </div>
+            
+            <form action="/api/settings" method="POST" class="setup-form">
+              <input type="hidden" name="setupComplete" value="true" />
+              <input type="hidden" name="redirect" value="/dashboard" />
+              
+              <div class="form-group">
+                <label>Target Hours</label>
+                <div class="input-wrapper">
+                  <input type="number" name="targetHours" value={settings.targetHours} required step="0.1" placeholder="e.g. 480" />
+                  <span class="input-unit">HRS</span>
+                </div>
+              </div>
+              
+              <div class="form-group">
+                <label>Hourly Allowance</label>
+                <div class="input-wrapper">
+                  <span class="input-prefix">₱</span>
+                  <input type="number" name="hourlyRate" value={settings.hourlyRate} required step="0.01" placeholder="e.g. 60.00" />
+                </div>
+              </div>
+              
+              <div class="form-group">
+                <label>Program Start Date</label>
+                <input type="date" name="startDate" value={settings.startDate} required />
+              </div>
+              
+              <button type="submit" class="btn-setup">Save & Initialize Dashboard</button>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div id="dash-content">
         <div class="dash-greeting">
           <h1>Welcome back, <span class="accent">{user.name?.split(' ')[0]}</span></h1>
           <p>Here's your progress overview for the current internship cycle.</p>
+        </div>
+
+        <div class="progress-section">
+          <div class="progress-header">
+            <span class="progress-label">PROGRAM COMPLETION</span>
+            <span class="progress-percent">{Math.min(100, (renderedHours / settings.targetHours) * 100).toFixed(1)}%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" style={`width: ${Math.min(100, (renderedHours / settings.targetHours) * 100)}%`}></div>
+          </div>
         </div>
 
         <div class="metrics-grid">
@@ -124,20 +175,24 @@ if (!isUsingManual) {
             <div class="metric-value">₱{settings.hourlyRate.toFixed(2)}<span class="metric-unit"> / hr</span></div>
             <div class="metric-sub">Current multiplier · updated weekly</div>
           </div>
-          <div class="metric-card">
-            <div class="metric-label">Target Date</div>
-            <div class="metric-value">{daysLeft}<span class="metric-unit"> days</span></div>
-            <div class="metric-sub">May 12, 2026 · program deadline</div>
+          <div class="metric-card highlight">
+            <div class="metric-label">Hours Remaining</div>
+            <div class="metric-value">{Math.max(0, settings.targetHours - renderedHours).toFixed(1)}<span class="metric-unit"> hrs</span></div>
+            <div class="metric-sub">
+              {(() => {
+                const remaining = Math.max(0, settings.targetHours - renderedHours);
+                const workDaysNeeded = Math.ceil(remaining / 8);
+                const finishDate = new Date();
+                // Basic estimation adding work days (simple flat addition for now)
+                finishDate.setDate(finishDate.getDate() + workDaysNeeded);
+                return `Est. Finish: ${finishDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+              })()}
+            </div>
           </div>
           <div class="metric-card">
-            <div class="metric-label">Your Hours</div>
-            <div class="metric-value">{renderedHours.toFixed(2)}<span class="metric-unit"> / {settings.targetHours} hrs</span></div>
-            <div class="metric-sub">{clockifyError ? <span class="error-text">{clockifyError}</span> : `Since ${new Date(settings.startDate).toLocaleDateString()}`}</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Team Status</div>
-            <div class="metric-value">3<span class="metric-unit"> active</span></div>
-            <div class="metric-sub">Developers online this session</div>
+            <div class="metric-label">Your Progress</div>
+            <div class="metric-value">{renderedHours.toFixed(1)}<span class="metric-unit"> / {settings.targetHours} hrs</span></div>
+            <div class="metric-sub">{clockifyError ? <span class="error-text">{clockifyError}</span> : `Logged since ${new Date(settings.startDate).toLocaleDateString()}`}</div>
           </div>
         </div>
 
@@ -219,9 +274,19 @@ if (!isUsingManual) {
   .dash-greeting h1 { font-size: 28px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
   .dash-greeting p { font-size: 14px; color: var(--text-secondary); }
   .accent { background: var(--ntv-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  
+  .progress-section { margin-bottom: 32px; background: var(--card-bg); padding: 20px 24px; border-radius: 14px; border: 1px solid var(--border-subtle); }
+  .progress-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; }
+  .progress-label { font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: 0.1em; }
+  .progress-percent { font-size: 18px; font-weight: 800; color: var(--ntv-orange); font-family: 'JetBrains Mono', monospace; }
+  .progress-track { width: 100%; height: 8px; background: rgba(255, 255, 255, 0.05); border-radius: 10px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--ntv-gradient); border-radius: 10px; box-shadow: 0 0 15px rgba(237, 102, 33, 0.3); transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
+
   .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin-bottom: 36px; }
   .metric-card { background: var(--card-bg); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 20px 22px; transition: border-color .2s, transform .2s; }
   .metric-card:hover { border-color: var(--ntv-orange); transform: translateY(-2px); }
+  .metric-card.highlight { border-color: rgba(237, 102, 33, 0.4); background: rgba(237, 102, 33, 0.04); box-shadow: 0 0 20px rgba(237, 102, 33, 0.05); }
+  .metric-card.highlight .metric-value { color: var(--ntv-orange); }
   .metric-label { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 10px; }
   .metric-value { font-size: 28px; font-weight: 700; color: var(--text-primary); letter-spacing: -.02em; line-height: 1; }
   .metric-unit { font-size: 13px; font-weight: 400; color: var(--text-secondary); }
@@ -260,6 +325,34 @@ if (!isUsingManual) {
   .mono { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
   .allowance-val { color: #34d399; font-weight: 600; }
   .empty-state { text-align: center; padding: 32px; color: var(--text-secondary); font-size: 13px; }
+  
+  /* MODAL STYLES */
+  .setup-overlay { position: fixed; inset: 0; background: rgba(5, 11, 22, 0.85); backdrop-filter: blur(8px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .setup-modal { background: #0d1421; border: 1px solid rgba(237, 102, 33, 0.3); border-radius: 20px; width: 100%; max-width: 440px; padding: 40px; box-shadow: 0 20px 80px rgba(0,0,0,0.6), 0 0 40px rgba(237, 102, 33, 0.1); animation: modalIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+  
+  .modal-header { text-align: center; margin-bottom: 32px; }
+  .modal-badge { display: inline-block; padding: 4px 10px; background: rgba(237, 102, 33, 0.15); color: var(--ntv-orange); font-size: 10px; font-weight: 700; border-radius: 4px; letter-spacing: 0.1em; margin-bottom: 12px; }
+  .modal-header h2 { font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+  .modal-header p { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+  
+  .setup-form { display: flex; flex-direction: column; gap: 20px; }
+  .form-group { display: flex; flex-direction: column; gap: 8px; }
+  .form-group label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+  
+  .input-wrapper { position: relative; display: flex; align-items: center; }
+  .input-prefix, .input-unit { position: absolute; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+  .input-prefix { left: 14px; }
+  .input-unit { right: 14px; color: var(--ntv-orange); }
+  
+  .setup-form input { width: 100%; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 12px 14px; color: #fff; font-size: 15px; font-family: 'Outfit', sans-serif; transition: all 0.2s; }
+  .setup-form input:focus { outline: none; border-color: var(--ntv-orange); background: rgba(237, 102, 33, 0.04); }
+  .setup-form .input-prefix + input { padding-left: 32px; }
+  .setup-form input[type="date"] { color-scheme: dark; }
+  
+  .btn-setup { margin-top: 10px; background: var(--ntv-gradient); border: none; border-radius: 10px; padding: 14px; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 15px rgba(237, 102, 33, 0.3); }
+  .btn-setup:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(237, 102, 33, 0.4); filter: brightness(1.1); }
+  .btn-setup:active { transform: translateY(0); }
 
-  @media (max-width: 640px) { #portal-main { margin-left: 0; padding: 24px 16px; } .metrics-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) { #portal-main { margin-left: 0; padding: 24px 16px; } .metrics-grid { grid-template-columns: 1fr; } .setup-modal { padding: 30px 20px; } }
 </style>

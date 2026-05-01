@@ -16,7 +16,7 @@ if (!user) {
   return Astro.redirect('/');
 }
 
-const settings = await getAppSettings();
+const settings = await getAppSettings(user.id);
 const now = new Date();
 const currentMonth = now.getMonth() + 1;
 const currentYear = now.getFullYear();

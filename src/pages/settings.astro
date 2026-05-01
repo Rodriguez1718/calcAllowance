@@ -14,7 +14,7 @@ if (!user) {
   return Astro.redirect('/');
 }
 
-const settings = await getAppSettings();
+const settings = await getAppSettings(user.id);
 const isClockifySet = !!(import.meta.env.CLOCKIFY_API_KEY && import.meta.env.CLOCKIFY_WORKSPACE_ID);
 const success = Astro.url.searchParams.get('success') === 'true';
 ---
@@ -40,6 +40,9 @@ const success = Astro.url.searchParams.get('success') === 'true';
           <section class="settings-card">
             <h2 class="card-title">Program Configuration</h2>
             <form action="/api/settings" method="POST" class="settings-form">
+              <input type="hidden" name="setupComplete" value="true" />
+              <input type="hidden" name="redirect" value="/settings" />
+              
               <div class="form-row">
                 <div class="form-group">
                   <label for="startDate">Program Start Date</label>
@@ -104,7 +107,7 @@ const success = Astro.url.searchParams.get('success') === 'true';
               </div>
               <div class="help-item">
                 <span class="help-label">Target Hours</span>
-                <span class="help-value">480.00</span>
+                <span class="help-value">{settings.targetHours.toFixed(2)}</span>
               </div>
             </div>
           </section>

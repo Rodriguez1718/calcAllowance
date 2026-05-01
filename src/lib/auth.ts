@@ -46,7 +46,7 @@ export function createSession(user: any): string {
   const id = crypto.randomUUID();
   sessions.set(id, {
     user,
-    expires: Date.now() + 1000 * 60 * 60 * 24, // 24 hours
+    expires: Date.now() + 1000 * 60 * 60 * 24 * 30, // 30 days
   });
   return id;
 }

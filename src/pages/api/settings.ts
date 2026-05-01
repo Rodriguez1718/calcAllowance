@@ -18,19 +18,24 @@ export const POST: APIRoute = async ({ request }) => {
     const startDate = formData.get('startDate') as string;
     const targetHours = parseFloat(formData.get('targetHours') as string);
     const hourlyRate = parseFloat(formData.get('hourlyRate') as string);
+    const setupComplete = formData.get('setupComplete') === 'true';
+    const redirectUrl = formData.get('redirect') as string || '/settings';
 
     if (!startDate || isNaN(targetHours) || isNaN(hourlyRate)) {
       return new Response('Invalid data', { status: 400 });
     }
 
-    await saveAppSettings({ startDate, targetHours, hourlyRate });
+    await saveAppSettings(session.id, { startDate, targetHours, hourlyRate, setupComplete });
 
-    const successUrl = new URL('/settings?success=true', request.url);
-    return Response.redirect(successUrl.toString(), 302);
+    const finalUrl = new URL(redirectUrl, request.url);
+    if (redirectUrl === '/settings') finalUrl.searchParams.set('success', 'true');
+    return Response.redirect(finalUrl.toString(), 302);
   } catch (e) {
     console.error('Settings save error:', e);
     const errorMsg = encodeURIComponent(e.message);
-    const errorUrl = new URL(`/settings?error=${errorMsg}`, request.url);
-    return Response.redirect(errorUrl.toString(), 302);
+    const redirectUrl = (await request.formData().catch(() => null))?.get('redirect') as string || '/settings';
+    const finalUrl = new URL(redirectUrl, request.url);
+    finalUrl.searchParams.set('error', errorMsg);
+    return Response.redirect(finalUrl.toString(), 302);
   }
 };
