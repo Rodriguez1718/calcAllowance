@@ -7,7 +7,7 @@ export const POST: APIRoute = async ({ request }) => {
   // Simple auth check
   const cookieHeader = request.headers.get('cookie') || '';
   const cookies = parse(cookieHeader);
-  const session = cookies.session ? getSession(cookies.session) : null;
+  const session = cookies.session ? await getSession(cookies.session) : null;
 
   if (!session) {
     return new Response('Unauthorized', { status: 401 });

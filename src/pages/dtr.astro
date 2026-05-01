@@ -10,7 +10,7 @@ import { getManualEntries } from '../lib/entries';
 
 const cookieHeader = Astro.request.headers.get('cookie') || '';
 const cookies = parse(cookieHeader);
-const user = cookies.session ? getSession(cookies.session) : null;
+const user = cookies.session ? await getSession(cookies.session) : null;
 
 if (!user) {
   return Astro.redirect('/');

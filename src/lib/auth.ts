@@ -5,6 +5,10 @@ const SCOPES = [
   'https://www.googleapis.com/auth/userinfo.profile',
 ];
 
+import { supabase } from './supabase';
+
+// ... SCOPES and other functions remain same ...
+
 export function getOAuth2Client() {
   return new google.auth.OAuth2(
     import.meta.env.GOOGLE_CLIENT_ID,
@@ -35,32 +39,47 @@ export async function getUserFromCode(code: string) {
     email: data.email,
     name: data.name,
     picture: data.picture,
-    hd: data.hd, // hosted domain (ctu.edu.ph)
+    hd: data.hd,
   };
 }
 
-// Simple in-memory session store (for dev; use Redis/DB in production)
-const sessions = new Map<string, { user: any; expires: number }>();
+export async function createSession(user: any): Promise<string> {
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(); // 30 days
+  
+  const { data, error } = await supabase
+    .from('sessions')
+    .insert({
+      user_data: user,
+      expires_at: expiresAt
+    })
+    .select()
+    .single();
 
-export function createSession(user: any): string {
-  const id = crypto.randomUUID();
-  sessions.set(id, {
-    user,
-    expires: Date.now() + 1000 * 60 * 60 * 24 * 30, // 30 days
-  });
-  return id;
+  if (error) throw error;
+  return data.id;
 }
 
-export function getSession(id: string) {
-  const session = sessions.get(id);
-  if (!session) return null;
-  if (Date.now() > session.expires) {
-    sessions.delete(id);
+export async function getSession(id: string) {
+  try {
+    const { data, error } = await supabase
+      .from('sessions')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error || !data) return null;
+
+    if (new Date() > new Date(data.expires_at)) {
+      await destroySession(id);
+      return null;
+    }
+
+    return data.user_data;
+  } catch {
     return null;
   }
-  return session.user;
 }
 
-export function destroySession(id: string) {
-  sessions.delete(id);
+export async function destroySession(id: string) {
+  await supabase.from('sessions').delete().eq('id', id);
 }

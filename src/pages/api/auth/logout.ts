@@ -7,7 +7,7 @@ export const GET: APIRoute = async ({ request }) => {
   const sessionId = cookies.session;
 
   if (sessionId) {
-    destroySession(sessionId);
+    await destroySession(sessionId);
   }
 
   const headers = new Headers();
