@@ -95,14 +95,21 @@ const syncLogs = [
   .page-header h1 { font-size: 28px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
   .page-header p { font-size: 14px; color: var(--text-secondary); }
 
+  @media (max-width: 900px) { 
+    #portal-main { margin-left: 0; padding: 24px 16px; } 
+    .page-header h1 { font-size: 24px; }
+    .logs-table th, .logs-table td { padding: 12px 16px; }
+  }
+
   .logs-table-wrapper { 
     background: var(--card-bg); 
     border: 1px solid var(--border-subtle); 
     border-radius: 14px; 
-    overflow: hidden;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
     box-shadow: 0 8px 32px rgba(0,0,0,.4);
   }
-  .logs-table { width: 100%; border-collapse: collapse; text-align: left; }
+  .logs-table { width: 100%; border-collapse: collapse; text-align: left; min-width: 600px; }
   .logs-table th { padding: 16px 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-secondary); border-bottom: 1px solid var(--border-subtle); background: rgba(255, 255, 255, 0.02); }
   .logs-table td { padding: 16px 20px; font-size: 13px; color: var(--text-primary); border-bottom: 1px solid var(--border-subtle); }
   .logs-table tr:hover { background: rgba(237, 102, 33, 0.03); }
@@ -117,6 +124,4 @@ const syncLogs = [
   
   .status-pill.success { background: rgba(52,211,153,.1); color: #34d399; border: 1px solid rgba(52,211,153,.2); }
   .status-pill.warning { background: rgba(251,191,36,.1); color: #fbbf24; border: 1px solid rgba(251,191,36,.2); }
-
-  @media (max-width: 640px) { #portal-main { margin-left: 0; padding: 24px 16px; } }
 </style>

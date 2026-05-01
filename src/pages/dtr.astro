@@ -102,7 +102,7 @@ const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month:
   <Header user={user} />
 
   <div id="portal-body">
-    <Sidebar user={user} activeTab="team-metrics" />
+    <Sidebar user={user} activeTab="dtr" />
 
     <main id="portal-main">
       <div class="no-print actions-bar">
@@ -126,100 +126,102 @@ const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month:
         </button>
       </div>
 
-      <div class="dtr-container" id="dtr-sheet">
-        <header class="dtr-header">
-          <div class="dtr-title">OJT DAILY TIME RECORD</div>
-          
-          <div class="dtr-info-grid">
-            <div class="info-item">
-              <span class="label">OJT Student:</span>
-              <span class="value underline">{user.name}</span>
+      <div class="dtr-scroll-wrapper">
+        <div class="dtr-container" id="dtr-sheet">
+          <header class="dtr-header">
+            <div class="dtr-title">OJT DAILY TIME RECORD</div>
+            
+            <div class="dtr-info-grid">
+              <div class="info-item">
+                <span class="label">OJT Student:</span>
+                <span class="value underline">{user.name}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Program:</span>
+                <span class="value underline">BS Information Technology</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Host Company:</span>
+                <span class="value underline">N-Compass TV</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Period:</span>
+                <span class="value underline">Month/Year: {monthName} {year}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Supervisor:</span>
+                <span class="value underline">Ms. Jessica Cordero</span>
+              </div>
+              <div class="info-item highlight">
+                <span class="label">Total Hours:</span>
+                <span class="value">{formatDuration(totalMonthSeconds)}</span>
+              </div>
             </div>
-            <div class="info-item">
-              <span class="label">Program:</span>
-              <span class="value underline">BS Information Technology</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Host Company:</span>
-              <span class="value underline">N-Compass TV</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Period:</span>
-              <span class="value underline">Month/Year: {monthName} {year}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Supervisor:</span>
-              <span class="value underline">Ms. Jessica Cordero</span>
-            </div>
-            <div class="info-item highlight">
-              <span class="label">Total Hours:</span>
-              <span class="value">{formatDuration(totalMonthSeconds)}</span>
-            </div>
-          </div>
-        </header>
+          </header>
 
-        <table class="dtr-table">
-          <thead>
-            <tr>
-              <th rowspan="2">Date</th>
-              <th colspan="2">AM</th>
-              <th colspan="2">PM</th>
-              <th rowspan="2">Total Hrs</th>
-            </tr>
-            <tr>
-              <th>In</th>
-              <th>Out</th>
-              <th>In</th>
-              <th>Out</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Object.entries(dtrData).map(([day, data]: [string, any]) => (
-              <tr class={data.totalSeconds === 0 ? 'weekend-row' : ''}>
-                <td class="date-col">{day}</td>
-                <td>{data.amIn}</td>
-                <td>{data.amOut}</td>
-                <td>{data.pmIn}</td>
-                <td>{data.pmOut}</td>
-                <td class="total-col">{data.totalSeconds > 0 ? formatDuration(data.totalSeconds) : ''}</td>
+          <table class="dtr-table">
+            <thead>
+              <tr>
+                <th rowspan="2">Date</th>
+                <th colspan="2">AM</th>
+                <th colspan="2">PM</th>
+                <th rowspan="2">Total Hrs</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+              <tr>
+                <th>In</th>
+                <th>Out</th>
+                <th>In</th>
+                <th>Out</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(dtrData).map(([day, data]: [string, any]) => (
+                <tr class={data.totalSeconds === 0 ? 'weekend-row' : ''}>
+                  <td class="date-col">{day}</td>
+                  <td>{data.amIn}</td>
+                  <td>{data.amOut}</td>
+                  <td>{data.pmIn}</td>
+                  <td>{data.pmOut}</td>
+                  <td class="total-col">{data.totalSeconds > 0 ? formatDuration(data.totalSeconds) : ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
-        <footer class="dtr-footer">
-          <div class="certification">
-            Student Certification: I certify that I rendered the above service.
-          </div>
-          <div class="sig-lines">
-            <div class="sig-group">
-              <span class="sig-label">Signature:</span>
-              <div class="sig-underline"></div>
+          <footer class="dtr-footer">
+            <div class="certification">
+              Student Certification: I certify that I rendered the above service.
             </div>
-            <div class="sig-group">
-              <span class="sig-label">Date:</span>
-              <div class="sig-underline"></div>
+            <div class="sig-lines">
+              <div class="sig-group">
+                <span class="sig-label">Signature:</span>
+                <div class="sig-underline"></div>
+              </div>
+              <div class="sig-group">
+                <span class="sig-label">Date:</span>
+                <div class="sig-underline"></div>
+              </div>
             </div>
-          </div>
 
-          <div class="approval">
-            VERIFIED & APPROVED:
-          </div>
-          <div class="sig-lines">
-            <div class="sig-group full">
-              <span class="sig-label">Supervisor Signature:</span>
-              <div class="sig-underline"></div>
+            <div class="approval">
+              VERIFIED & APPROVED:
             </div>
-            <div class="sig-group">
-              <span class="sig-label">Date:</span>
-              <div class="sig-underline"></div>
+            <div class="sig-lines">
+              <div class="sig-group full">
+                <span class="sig-label">Supervisor Signature:</span>
+                <div class="sig-underline"></div>
+              </div>
+              <div class="sig-group">
+                <span class="sig-label">Date:</span>
+                <div class="sig-underline"></div>
+              </div>
+              <div class="sig-group">
+                <span class="sig-label">Position:</span>
+                <span class="value">Project Manager</span>
+              </div>
             </div>
-            <div class="sig-group">
-              <span class="sig-label">Position:</span>
-              <span class="value">Project Manager</span>
-            </div>
-          </div>
-        </footer>
+          </footer>
+        </div>
       </div>
     </main>
   </div>
@@ -235,7 +237,7 @@ const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month:
     .print-btn { justify-content: center; }
   }
 
-  .actions-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; max-width: 800px; }
+  .actions-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; max-width: 800px; margin-left: auto; margin-right: auto; }
   .month-selector select { background: rgba(255,255,255,0.05); border: 1px solid var(--border-subtle); color: white; padding: 8px 12px; border-radius: 6px; outline: none; }
   
   .print-btn { 
@@ -243,6 +245,13 @@ const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month:
     padding: 10px 18px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s;
   }
   .print-btn:hover { background: var(--ntv-red); transform: translateY(-1px); }
+
+  .dtr-scroll-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 20px;
+  }
 
   /* DTR Styling - Matching the Screenshot */
   .dtr-container { 
@@ -300,7 +309,8 @@ const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month:
     }
   }
 
-  @media (max-width: 1000px) {
-    .dtr-container { width: 100%; overflow-x: auto; transform: scale(0.9); transform-origin: top left; }
+  @media (max-width: 850px) {
+    .dtr-container { padding: 20px; width: 800px; margin: 0; }
+    .dtr-scroll-wrapper { padding: 0 10px 20px; }
   }
 </style>

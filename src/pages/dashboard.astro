@@ -355,13 +355,22 @@ if (!isUsingManual) {
   .btn-setup:active { transform: translateY(0); }
 
   @media (max-width: 900px) {
-    #portal-main { margin-left: 0; padding: 24px 16px; }
-    #dash-content { max-width: 100%; }
-    .dash-greeting h1 { font-size: 24px; }
-    .metrics-grid { grid-template-columns: 1fr; }
-    .table-wrapper { overflow-x: auto; }
-    .breakdown-table { min-width: 500px; }
+    #portal-main { margin-left: 0; padding: 24px 16px; width: 100%; }
+    #dash-content { max-width: 100%; width: 100%; }
+    .dash-greeting h1 { font-size: 22px; }
+    .metrics-grid { grid-template-columns: 1fr; gap: 12px; }
+    .metric-value { font-size: 24px; }
+    .table-wrapper { 
+      overflow-x: auto; 
+      -webkit-overflow-scrolling: touch; 
+      margin: 0 -4px;
+      padding: 0 4px;
+    }
+    .breakdown-table { min-width: 480px; }
     .activity-content { flex-direction: column; align-items: flex-start; gap: 4px; }
-    .setup-modal { padding: 30px 20px; width: 95%; }
+    .activity-time { opacity: 0.6; }
+    .setup-modal { padding: 24px 16px; width: 100%; margin: 0 10px; }
+    .modal-header h2 { font-size: 20px; }
+    .modal-header { margin-bottom: 24px; }
   }
 </style>

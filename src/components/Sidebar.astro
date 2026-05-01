@@ -1,8 +1,41 @@
 ---
-const { user, activeTab } = Astro.props;
+const { user, activeTab, isLocked = false } = Astro.props;
+
+const navItems = [
+  { 
+    id: 'dashboard', 
+    label: 'Dashboard', 
+    href: '/dashboard', 
+    icon: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/></svg>`
+  },
+  { 
+    id: 'sync-logs', 
+    label: 'Sync Logs', 
+    href: '/sync-logs', 
+    icon: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4 4v5h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 20v-5h-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.93 15a8 8 0 1 0 .67-8.37L4 11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+  },
+  { 
+    id: 'tracker', 
+    label: 'Time Tracker', 
+    href: '/tracker', 
+    icon: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`
+  },
+  { 
+    id: 'dtr', 
+    label: 'DTR Sheet', 
+    href: '/dtr', 
+    icon: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" stroke="currentColor" stroke-width="1.7"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>`
+  },
+  { 
+    id: 'settings', 
+    label: 'Settings', 
+    href: '/settings', 
+    icon: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" stroke="currentColor" stroke-width="1.7"/></svg>`
+  }
+];
 ---
 
-<aside id="sidebar">
+<aside id="sidebar" class={isLocked ? 'sidebar-locked' : ''}>
   <div class="sidebar-header mobile-only">
     <div class="logo-mark">
       <img src="/logo.png" alt="Logo" width="28" height="28" />
@@ -11,35 +44,38 @@ const { user, activeTab } = Astro.props;
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
   </div>
-  <div class="sidebar-user">
-    {user.picture && <img class="sidebar-avatar" src={user.picture} alt="" width="32" height="32" />}
-    <div>
-      <div class="sidebar-name">{user.name}</div>
-      <div class="sidebar-email" title={user.email}>{user.email}</div>
+
+  {isLocked ? (
+    <div class="sidebar-lock">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="10" rx="2" stroke="var(--ntv-orange)" stroke-width="1.8"/><path d="M8 11V7a4 4 0 1 1 8 0v4" stroke="var(--ntv-orange)" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span>Login to unlock</span>
     </div>
-  </div>
+  ) : (
+    <div class="sidebar-user">
+      {user?.picture && <img class="sidebar-avatar" src={user.picture} alt="" width="32" height="32" />}
+      <div>
+        <div class="sidebar-name">{user?.name}</div>
+        <div class="sidebar-email" title={user?.email}>{user?.email}</div>
+      </div>
+    </div>
+  )}
+
   <nav class="sidebar-nav">
-    <a href="/dashboard" class={`nav-item ${activeTab === 'dashboard' ? 'active-nav' : ''}`}>
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/></svg>
-      <span>Dashboard</span>
-    </a>
-    <a href="/sync-logs" class={`nav-item ${activeTab === 'sync-logs' ? 'active-nav' : ''}`}>
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4 4v5h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 20v-5h-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.93 15a8 8 0 1 0 .67-8.37L4 11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <span>Sync Logs</span>
-    </a>
-    <a href="/tracker" class={`nav-item ${activeTab === 'tracker' ? 'active-nav' : ''}`}>
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      <span>Time Tracker</span>
-    </a>
-    <a href="/team-metrics" class={`nav-item ${activeTab === 'team-metrics' ? 'active-nav' : ''}`}>
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" stroke="currentColor" stroke-width="1.7"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-      <span>DTR Sheet</span>
-    </a>
-    <a href="/settings" class={`nav-item ${activeTab === 'settings' ? 'active-nav' : ''}`}>
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" stroke="currentColor" stroke-width="1.7"/></svg>
-      <span>Settings</span>
-    </a>
+    {navItems.map(item => {
+      const isActive = activeTab === item.id;
+      const NavTag = isLocked ? 'div' : 'a';
+      return (
+        <NavTag 
+          href={isLocked ? undefined : item.href} 
+          class={`nav-item ${isActive ? 'active-nav' : ''} ${isLocked ? 'locked-item' : ''}`}
+        >
+          <Fragment set:html={item.icon} />
+          <span>{item.label}</span>
+        </NavTag>
+      );
+    })}
   </nav>
+
   <div class="sidebar-footer">
     <div class="sidebar-version">v1.0.4-stable</div>
   </div>
@@ -48,8 +84,8 @@ const { user, activeTab } = Astro.props;
 <style>
   #sidebar {
     position: fixed; left: 0; top: 0; bottom: 0; width: 220px;
-    background: #0d1421; /* Solid dark color for drawer */
-    border-right: 1px solid var(--border-subtle);
+    background: rgba(5, 11, 22, 0.85); backdrop-filter: blur(20px);
+    border-right: 1px solid rgba(237, 102, 33, 0.1);
     display: flex; flex-direction: column; padding: 20px 12px; gap: 6px;
     z-index: 1000;
     transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
@@ -67,6 +103,27 @@ const { user, activeTab } = Astro.props;
   .sidebar-avatar { border-radius: 50%; border: 2px solid var(--ntv-orange); }
   .sidebar-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
   .sidebar-email { font-size: 10px; color: var(--text-secondary); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
+
+  /* Locked Mode Styles */
+  .sidebar-lock {
+    display: flex; align-items: center; gap: 6px; font-size: 10px;
+    color: var(--ntv-orange); opacity: 0.8; letter-spacing: .06em; text-transform: uppercase;
+    font-weight: 700; background: rgba(237,102,33,.07);
+    border: 1px solid rgba(237,102,33,.15); border-radius: 6px;
+    padding: 6px 10px; margin-bottom: 16px;
+  }
+  .locked-item {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  .locked-item:hover {
+    background: none;
+    color: var(--text-secondary);
+  }
+  .locked-item.active-nav:hover {
+    background: rgba(237, 102, 33, 0.14);
+    color: var(--ntv-orange);
+  }
   
   .sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
   .nav-item {
