@@ -134,15 +134,32 @@ export async function getDailyDTR(clockifyUserId: string, year: number, month: n
 }
 
 function parseIsoDuration(duration: string) {
-  // Handles formats like P1DT2H30M5S or PT1H30M
+  if (!duration) return 0;
   const regex = /P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/;
   const matches = duration.match(regex);
   if (!matches) return 0;
-
   const days = parseInt(matches[1] || '0', 10);
   const hours = parseInt(matches[2] || '0', 10);
   const minutes = parseInt(matches[3] || '0', 10);
   const seconds = parseInt(matches[4] || '0', 10);
-
   return (days * 24 * 3600) + (hours * 3600) + (minutes * 60) + seconds;
+}
+
+export async function getRecentEntries(clockifyUserId: string) {
+  const apiKey = import.meta.env.CLOCKIFY_API_KEY;
+  const workspaceId = import.meta.env.CLOCKIFY_WORKSPACE_ID;
+
+  const response = await fetch(
+    `${CLOCKIFY_API_URL}/workspaces/${workspaceId}/user/${clockifyUserId}/time-entries?page-size=4`,
+    { headers: { 'X-Api-Key': apiKey } }
+  );
+
+  if (!response.ok) return [];
+  const entries = await response.json();
+  
+  return entries.map((e: any) => ({
+    description: e.description || 'Working on tasks',
+    startTime: new Date(e.timeInterval.start).toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+    duration: parseIsoDuration(e.timeInterval.duration)
+  }));
 }

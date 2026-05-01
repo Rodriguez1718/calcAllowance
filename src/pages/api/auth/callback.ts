@@ -18,7 +18,7 @@ export const GET: APIRoute = async ({ request }) => {
     headers.set('Location', '/dashboard');
     headers.set(
       'Set-Cookie',
-      `session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`
+      `session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`
     );
 
     return new Response(null, { status: 302, headers });
