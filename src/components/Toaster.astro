@@ -99,4 +99,18 @@
       transform: translateY(0) scale(1);
     }
   }
+  @media (max-width: 600px) {
+    #toast-container {
+      bottom: 16px;
+      right: 16px;
+      left: 16px;
+    }
+    .toast {
+      min-width: unset;
+      width: 100%;
+    }
+    .toast.fade-out {
+      transform: translateY(20px);
+    }
+  }
 </style>

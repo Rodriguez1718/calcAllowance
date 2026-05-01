@@ -191,7 +191,6 @@ const success = Astro.url.searchParams.get('success') === 'true';
   }
   .danger-btn:hover { background: var(--ntv-red); color: white; transform: translateY(-1px); }
 
-
   .settings-form { display: flex; flex-direction: column; gap: 20px; }
   .form-row.split { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
   .form-group { display: flex; flex-direction: column; gap: 8px; }
@@ -222,5 +221,14 @@ const success = Astro.url.searchParams.get('success') === 'true';
   .save-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(237, 102, 33, 0.3); }
   .save-btn:active { transform: translateY(0); }
 
-  @media (max-width: 640px) { #portal-main { margin-left: 0; padding: 24px 16px; } .profile-preview { flex-direction: column; align-items: center; } .config-help { flex-direction: column; gap: 16px; } .form-row.split { grid-template-columns: 1fr; } }
+  @media (max-width: 900px) { 
+    #portal-main { margin-left: 0; padding: 24px 16px; } 
+    .page-header h1 { font-size: 24px; }
+    .settings-card { padding: 20px; }
+    .profile-preview { flex-direction: column; align-items: stretch; gap: 16px; } 
+    .profile-img { align-self: center; }
+    .config-help { flex-direction: column; gap: 16px; } 
+    .form-row.split { grid-template-columns: 1fr; } 
+    .save-btn { align-self: stretch; text-align: center; }
+  }
 </style>

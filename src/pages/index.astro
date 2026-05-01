@@ -1,5 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import Sidebar from '../components/Sidebar.astro';
 import { getSession } from '../lib/auth';
 import { parse } from 'cookie';
 
@@ -44,33 +45,7 @@ if (user) {
 
   <div id="portal-body">
     <!-- SIDEBAR (Locked Preview) -->
-    <aside id="sidebar">
-      <div class="sidebar-lock">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="10" rx="2" stroke="var(--ntv-orange)" stroke-width="1.8"/><path d="M8 11V7a4 4 0 1 1 8 0v4" stroke="var(--ntv-orange)" stroke-width="1.8" stroke-linecap="round"/></svg>
-        <span>Login to unlock</span>
-      </div>
-      <nav class="sidebar-nav">
-        <div class="nav-item active-nav">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/></svg>
-          <span>Dashboard</span>
-        </div>
-        <div class="nav-item">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4 4v5h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 20v-5h-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.93 15a8 8 0 1 0 .67-8.37L4 11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span>Sync Logs</span>
-        </div>
-        <div class="nav-item">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M18 20V10M12 20V4M6 20v-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-          <span>Team Metrics</span>
-        </div>
-        <div class="nav-item">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" stroke="currentColor" stroke-width="1.7"/></svg>
-          <span>Settings</span>
-        </div>
-      </nav>
-      <div class="sidebar-footer">
-        <div class="sidebar-version">v1.0.4-stable</div>
-      </div>
-    </aside>
+    <Sidebar isLocked={true} activeTab="dashboard" />
 
     <!-- MAIN STAGE -->
     <main id="portal-main">
@@ -184,30 +159,8 @@ if (user) {
   .sdiv { color: rgba(255,255,255,.2); }
   .status-api { color: rgba(255,255,255,.45); font-size: 11px; }
 
-  /* SIDEBAR */
-  #sidebar {
-    position: fixed; left: 0; top: 56px; bottom: 0; width: 200px;
-    background: rgba(5,11,22,0.85); backdrop-filter: blur(16px);
-    border-right: 1px solid rgba(237,102,33,0.1);
-    display: flex; flex-direction: column; padding: 20px 12px; gap: 6px;
-  }
-  .sidebar-lock {
-    display: flex; align-items: center; gap: 6px; font-size: 10px;
-    color: var(--ntv-orange); opacity: 0.8; letter-spacing: .06em; text-transform: uppercase;
-    font-weight: 700; background: rgba(237,102,33,.07);
-    border: 1px solid rgba(237,102,33,.15); border-radius: 6px;
-    padding: 6px 10px; margin-bottom: 16px;
-  }
-  .nav-item {
-    display: flex; align-items: center; gap: 11px; padding: 10px 12px;
-    border-radius: 8px; font-size: 13px; font-weight: 500;
-    color: rgba(255,255,255,.3); cursor: not-allowed; opacity: .6;
-  }
-  .nav-item.active-nav { background: rgba(237,102,33,.08); color: var(--ntv-orange); border: 1px solid rgba(237,102,33,.12); }
-  .sidebar-version { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: rgba(255,255,255,.2); }
-
   /* MAIN */
-  #portal-main { margin-left: 200px; flex: 1; display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); position: relative; padding: 32px 24px; }
+  #portal-main { margin-left: 220px; flex: 1; display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); position: relative; padding: 32px 24px; }
   .bg-grid { position: fixed; inset: 0; background-image: linear-gradient(rgba(237,102,33,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(237,102,33,.03) 1px, transparent 1px); background-size: 40px 40px; pointer-events: none; }
   .bg-glow { position: fixed; top: 30%; left: 55%; transform: translateX(-50%); width: 560px; height: 360px; background: radial-gradient(ellipse, rgba(237,102,33,.08) 0%, transparent 70%); pointer-events: none; }
 
