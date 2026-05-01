@@ -354,5 +354,14 @@ if (!isUsingManual) {
   .btn-setup:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(237, 102, 33, 0.4); filter: brightness(1.1); }
   .btn-setup:active { transform: translateY(0); }
 
-  @media (max-width: 640px) { #portal-main { margin-left: 0; padding: 24px 16px; } .metrics-grid { grid-template-columns: 1fr; } .setup-modal { padding: 30px 20px; } }
+  @media (max-width: 900px) {
+    #portal-main { margin-left: 0; padding: 24px 16px; }
+    #dash-content { max-width: 100%; }
+    .dash-greeting h1 { font-size: 24px; }
+    .metrics-grid { grid-template-columns: 1fr; }
+    .table-wrapper { overflow-x: auto; }
+    .breakdown-table { min-width: 500px; }
+    .activity-content { flex-direction: column; align-items: flex-start; gap: 4px; }
+    .setup-modal { padding: 30px 20px; width: 95%; }
+  }
 </style>

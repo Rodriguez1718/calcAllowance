@@ -363,8 +363,11 @@ const formatTo12hr = (timeStr: string) => {
   .btn-outline:hover { background: var(--ntv-orange); color: white; }
 
   @media (max-width: 900px) {
+    #portal-main { margin-left: 0; padding: 24px 16px; }
     .content-grid { grid-template-columns: 1fr; }
-    .time-display-wrapper { flex-direction: column; align-items: flex-start; gap: 24px; }
+    .time-display-wrapper { flex-direction: column; align-items: stretch; gap: 24px; }
     .btn-primary { width: 100%; justify-content: center; }
+    .main-control { padding: 20px; }
+    .live-digits { font-size: 24px; }
   }
 </style>

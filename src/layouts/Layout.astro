@@ -1,22 +1,38 @@
 ---
-import Toaster from '../components/Toaster.astro';
+import Toaster from "../components/Toaster.astro";
 ---
+
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="generator" content={Astro.generator} />
-    <meta name="description" content="Internship Portal — Professional Hours & Progress Tracker." />
+    <meta
+      name="description"
+      content="Internship Portal — Professional Hours & Progress Tracker."
+    />
     <title>Internship Portal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
+    <div class="sidebar-overlay" id="global-overlay"></div>
     <slot />
     <Toaster />
+
+    <script is:inline>
+      document
+        .getElementById("global-overlay")
+        ?.addEventListener("click", () => {
+          document.body.classList.remove("sidebar-open");
+        });
+    </script>
   </body>
 </html>
 
@@ -32,12 +48,49 @@ import Toaster from '../components/Toaster.astro';
     --card-bg: rgba(13, 20, 33, 0.7);
   }
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; }
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  html,
   body {
-    font-family: 'Outfit', 'Inter', system-ui, sans-serif;
+    height: 100%;
+  }
+  body {
+    font-family: "Outfit", "Inter", system-ui, sans-serif;
     background: var(--ntv-bg);
     color: var(--text-primary);
     overflow-x: hidden;
+  }
+  body.sidebar-open {
+    overflow: hidden;
+  }
+
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 900;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  body.sidebar-open .sidebar-overlay {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Utilities */
+  .mobile-only {
+    display: none;
+  }
+  @media (max-width: 900px) {
+    .mobile-only {
+      display: flex;
+    }
   }
 </style>
