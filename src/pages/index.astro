@@ -17,15 +17,7 @@ if (user) {
   <header id="sys-header">
     <div class="header-left">
       <div class="logo-mark">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M12 2L3 7V12C3 16.55 6.84 20.74 12 22C17.16 20.74 21 16.55 21 12V7L12 2Z" fill="url(#ntv_grad)"/>
-          <path d="M9 12L11 14L15 10" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <defs>
-            <linearGradient id="ntv_grad" x1="3" y1="2" x2="21" y2="22" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stop-color="#ed6621"/><stop offset="100%" stop-color="#e61e2a"/>
-            </linearGradient>
-          </defs>
-        </svg>
+        <img src="/logo.png" alt="Logo" width="32" height="32" />
       </div>
       <div class="logo-text">
         <span class="logo-primary">INTERNSHIP</span>
@@ -262,5 +254,18 @@ if (user) {
   }
   .sec-badge strong { color: var(--ntv-orange); font-weight: 600; }
 
-  @media (max-width: 640px) { #sidebar { display: none; } #portal-main { margin-left: 0; } #command-card { padding: 24px 18px; } }
+  @media (max-width: 900px) {
+    #sidebar { display: none; }
+    #portal-main { margin-left: 0; padding: 16px; }
+    .header-center, .header-right { display: none; }
+    #sys-header { justify-content: center; padding: 0 16px; }
+    .metrics-row { flex-direction: column; align-items: center; }
+    .metric-card { max-width: 100%; width: 100%; min-width: unset; }
+  }
+
+  @media (max-width: 600px) {
+    .metrics-row { display: none; }
+    #command-card { padding: 32px 20px; border-radius: 16px; }
+    .card-title { font-size: 20px; }
+  }
 </style>

@@ -3,6 +3,14 @@ const { user, activeTab } = Astro.props;
 ---
 
 <aside id="sidebar">
+  <div class="sidebar-header mobile-only">
+    <div class="logo-mark">
+      <img src="/logo.png" alt="Logo" width="28" height="28" />
+    </div>
+    <button id="sidebar-close" class="close-btn" aria-label="Close Menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
   <div class="sidebar-user">
     {user.picture && <img class="sidebar-avatar" src={user.picture} alt="" width="32" height="32" />}
     <div>
@@ -39,11 +47,17 @@ const { user, activeTab } = Astro.props;
 
 <style>
   #sidebar {
-    position: fixed; left: 0; top: 56px; bottom: 0; width: 220px;
-    background: rgba(5, 11, 22, 0.88); backdrop-filter: blur(16px);
+    position: fixed; left: 0; top: 0; bottom: 0; width: 220px;
+    background: #0d1421; /* Solid dark color for drawer */
     border-right: 1px solid var(--border-subtle);
     display: flex; flex-direction: column; padding: 20px 12px; gap: 6px;
+    z-index: 1000;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   }
+
+  .sidebar-header { display: none; align-items: center; justify-content: space-between; padding: 10px 8px 24px; }
+  .close-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px; }
+  
   .sidebar-user {
     display: flex; align-items: center; gap: 10px;
     padding: 10px; background: rgba(237, 102, 33, 0.06);
@@ -53,6 +67,7 @@ const { user, activeTab } = Astro.props;
   .sidebar-avatar { border-radius: 50%; border: 2px solid var(--ntv-orange); }
   .sidebar-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
   .sidebar-email { font-size: 10px; color: var(--text-secondary); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
+  
   .sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
   .nav-item {
     display: flex; align-items: center; gap: 11px; padding: 10px 12px;
@@ -68,7 +83,24 @@ const { user, activeTab } = Astro.props;
   .sidebar-footer { margin-top: auto; padding: 0 4px; }
   .sidebar-version { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: rgba(255, 255, 255, 0.2); letter-spacing: .06em; }
 
-  @media (max-width: 640px) {
-    #sidebar { display: none; }
+  @media (min-width: 901px) {
+    #sidebar { top: 56px; } /* Desktop behavior */
+  }
+
+  @media (max-width: 900px) {
+    #sidebar {
+      transform: translateX(-100%);
+    }
+    :global(.sidebar-open) #sidebar {
+      transform: translateX(0);
+      box-shadow: 20px 0 60px rgba(0,0,0,0.8);
+    }
+    .sidebar-header { display: flex; }
   }
 </style>
+
+<script>
+  document.getElementById('sidebar-close')?.addEventListener('click', () => {
+    document.body.classList.remove('sidebar-open');
+  });
+</script>
