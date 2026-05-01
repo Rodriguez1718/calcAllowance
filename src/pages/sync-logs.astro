@@ -13,11 +13,28 @@ if (!user) {
   return Astro.redirect('/');
 }
 
-// Fetch sync logs (mock for now or real if desired)
+// Check user mode
+import { getClockifyUser } from '../lib/clockify';
+let userInClockify = false;
+try {
+  if (import.meta.env.CLOCKIFY_API_KEY) {
+    const clockifyUser = await getClockifyUser(user.email);
+    userInClockify = !!clockifyUser;
+  }
+} catch (e) {
+  userInClockify = false;
+}
+
 const syncLogs = [
-  { id: 1, type: 'Sync', status: 'Success', date: '2026-05-01 10:45 AM', duration: '1.2s', details: 'Fetched 12 new time entries' },
-  { id: 2, type: 'Auth', status: 'Success', date: '2026-05-01 10:40 AM', duration: '0.8s', details: 'Google OAuth session established' },
-  { id: 3, type: 'Sync', status: 'Warning', date: '2026-04-30 09:12 PM', duration: '2.5s', details: 'Rate limit hit, partially synced' },
+  { 
+    id: 1, 
+    type: userInClockify ? 'Sync' : 'Mode', 
+    status: 'Success', 
+    date: new Date().toLocaleString(), 
+    duration: '0.1s', 
+    details: userInClockify ? 'Connected to Clockify Workspace' : 'Manual Time Tracking Active' 
+  },
+  { id: 2, type: 'Auth', status: 'Success', date: 'System', duration: '0.8s', details: 'Google OAuth session established' },
 ];
 ---
 <Layout>

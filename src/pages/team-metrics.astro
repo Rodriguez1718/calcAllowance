@@ -6,6 +6,7 @@ import { getSession } from '../lib/auth';
 import { parse } from 'cookie';
 import { getClockifyUser, getDailyDTR } from '../lib/clockify';
 import { getAppSettings } from '../lib/settings';
+import { getManualEntries } from '../lib/entries';
 
 const cookieHeader = Astro.request.headers.get('cookie') || '';
 const cookies = parse(cookieHeader);
@@ -24,18 +25,69 @@ const currentYear = now.getFullYear();
 const month = parseInt(Astro.url.searchParams.get('month') || currentMonth.toString());
 const year = parseInt(Astro.url.searchParams.get('year') || currentYear.toString());
 
+const isClockifySet = !!(import.meta.env.CLOCKIFY_API_KEY && import.meta.env.CLOCKIFY_WORKSPACE_ID);
+
 let dtrData = {};
 let totalMonthSeconds = 0;
 let clockifyError = null;
+let isUsingManual = false;
 
-try {
-  const clockifyUser = await getClockifyUser(user.email);
-  if (clockifyUser) {
-    dtrData = await getDailyDTR(clockifyUser.id, year, month);
-    totalMonthSeconds = Object.values(dtrData).reduce((acc: number, day: any) => acc + day.totalSeconds, 0);
+const formatTo12hr = (timeStr: string) => {
+  if (!timeStr) return '';
+  const [h, m] = timeStr.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hour = h % 12 || 12;
+  return `${hour}:${String(m).padStart(2, '0')} ${ampm}`;
+};
+
+if (isClockifySet) {
+  try {
+    const clockifyUser = await getClockifyUser(user.email);
+    if (clockifyUser) {
+      dtrData = await getDailyDTR(clockifyUser.id, year, month);
+      totalMonthSeconds = Object.values(dtrData).reduce((acc, day) => acc + day.totalSeconds, 0);
+    } else {
+      isUsingManual = true;
+    }
+  } catch (err) {
+    clockifyError = err.message;
+    isUsingManual = true;
   }
-} catch (err) {
-  clockifyError = (err as Error).message;
+} else {
+  isUsingManual = true;
+}
+
+if (isUsingManual) {
+  // Manual DTR Fallback
+  const manualEntries = await getManualEntries(user.id);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  
+  // Initialize empty DTR for the whole month
+  for (let i = 1; i <= daysInMonth; i++) {
+    dtrData[i] = { amIn: '', amOut: '', pmIn: '', pmOut: '', totalSeconds: 0 };
+  }
+
+  const filtered = manualEntries.filter(e => {
+    const d = new Date(e.date);
+    return d.getMonth() + 1 === month && d.getFullYear() === year;
+  });
+
+  filtered.forEach(e => {
+    const day = new Date(e.date).getDate();
+    const [h, m] = e.startTime.split(':').map(Number);
+    const isAM = h < 12 || (h === 12 && m < 30);
+    
+    if (isAM) {
+      if (!dtrData[day].amIn || e.startTime < dtrData[day].amIn) dtrData[day].amIn = formatTo12hr(e.startTime);
+      if (!dtrData[day].amOut || e.endTime > dtrData[day].amOut) dtrData[day].amOut = formatTo12hr(e.endTime);
+    } else {
+      if (!dtrData[day].pmIn || e.startTime < dtrData[day].pmIn) dtrData[day].pmIn = formatTo12hr(e.startTime);
+      if (!dtrData[day].pmOut || e.endTime > dtrData[day].pmOut) dtrData[day].pmOut = formatTo12hr(e.endTime);
+    }
+    dtrData[day].totalSeconds += e.durationSeconds;
+  });
+
+  totalMonthSeconds = Object.values(dtrData).reduce((acc, day) => acc + day.totalSeconds, 0);
 }
 
 const formatDuration = (seconds: number) => {

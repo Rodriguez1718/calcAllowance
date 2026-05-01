@@ -8,11 +8,11 @@ import Toaster from '../components/Toaster.astro';
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="generator" content={Astro.generator} />
-    <meta name="description" content="IDRIS Portal — Rendered Hours & Allowance Tracker." />
-    <title>NTV — IDRIS Allowance Portal</title>
+    <meta name="description" content="Internship Portal — Professional Hours & Progress Tracker." />
+    <title>Internship Portal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   </head>
   <body>
     <slot />
@@ -25,19 +25,17 @@ import Toaster from '../components/Toaster.astro';
     --ntv-bg: #050b16;
     --ntv-orange: #ed6621;
     --ntv-red: #e61e2a;
-    --ntv-magenta: #a60b3f;
-    --ntv-gradient: linear-gradient(90deg, #ed6621, #e61e2a);
-    --ntv-gradient-alt: linear-gradient(90deg, #e61e2a, #a60b3f);
+    --ntv-gradient: linear-gradient(135deg, #ed6621 0%, #e61e2a 100%);
     --text-primary: #ffffff;
-    --text-secondary: rgba(255, 255, 255, 0.7);
+    --text-secondary: rgba(255, 255, 255, 0.65);
     --border-subtle: rgba(255, 255, 255, 0.08);
-    --card-bg: rgba(13, 17, 30, 0.8);
+    --card-bg: rgba(13, 20, 33, 0.7);
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Outfit', 'Inter', system-ui, sans-serif;
     background: var(--ntv-bg);
     color: var(--text-primary);
     overflow-x: hidden;
