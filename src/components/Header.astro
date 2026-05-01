@@ -67,6 +67,10 @@ const { user } = Astro.props;
   }
   .logout-btn:hover { background: var(--ntv-red); color: white; transform: scale(1.05); }
 
+  @media print {
+    #sys-header { display: none !important; }
+  }
+
   @media (max-width: 640px) {
     .logo-secondary, .logo-sep { display: none; }
   }
