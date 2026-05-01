@@ -12,7 +12,7 @@ export const GET: APIRoute = async ({ request }) => {
 
   try {
     const user = await getUserFromCode(code);
-    const sessionId = createSession(user);
+    const sessionId = await createSession(user);
 
     const headers = new Headers();
     headers.set('Location', '/dashboard');

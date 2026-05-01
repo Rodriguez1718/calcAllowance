@@ -7,7 +7,7 @@ import { parse } from 'cookie';
 // Check if user is logged in
 const cookieHeader = Astro.request.headers.get('cookie') || '';
 const cookies = parse(cookieHeader);
-const user = cookies.session ? getSession(cookies.session) : null;
+const user = cookies.session ? await getSession(cookies.session) : null;
 
 // If logged in, redirect to dashboard
 if (user) {
