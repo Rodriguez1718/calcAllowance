@@ -1,0 +1,370 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Header from '../components/Header.astro';
+import Sidebar from '../components/Sidebar.astro';
+import { getSession } from '../lib/auth';
+import { parse } from 'cookie';
+import { getManualEntries, addManualEntry, deleteManualEntry, getActiveTimer, startTimer, stopTimer, updateTimerStart } from '../lib/entries';
+import { getClockifyUser } from '../lib/clockify';
+
+const cookieHeader = Astro.request.headers.get('cookie') || '';
+const cookies = parse(cookieHeader);
+const user = cookies.session ? getSession(cookies.session) : null;
+
+if (!user) return Astro.redirect('/');
+
+let userInClockify = false;
+try {
+  if (import.meta.env.CLOCKIFY_API_KEY) {
+    const clockifyUser = await getClockifyUser(user.email);
+    userInClockify = !!clockifyUser;
+  }
+} catch (e) {
+  userInClockify = false;
+}
+
+if (Astro.request.method === 'POST') {
+  const formData = await Astro.request.formData();
+  const action = formData.get('action');
+
+  if (action === 'start-timer' && !userInClockify) {
+    const desc = formData.get('description') as string;
+    await startTimer(user.id, desc);
+    return Astro.redirect('/tracker');
+  }
+
+  if (action === 'update-start' && !userInClockify) {
+    const newStart = formData.get('startTime') as string;
+    await updateTimerStart(user.id, newStart);
+    return Astro.redirect('/tracker');
+  }
+
+  if (action === 'stop-timer' && !userInClockify) {
+    const desc = formData.get('description') as string;
+    try {
+      await stopTimer(user.id, desc);
+      return Astro.redirect('/tracker?success=true');
+    } catch (e) {
+      return Astro.redirect(`/tracker?error=${encodeURIComponent(e.message)}`);
+    }
+  }
+
+  if (action === 'add' && !userInClockify) {
+    const description = formData.get('description') as string;
+    const date = formData.get('date') as string;
+    const startTime = formData.get('startTime') as string;
+    const endTime = formData.get('endTime') as string;
+    try {
+      await addManualEntry({ userId: user.id, description, date, startTime, endTime });
+      return Astro.redirect('/tracker?success=true');
+    } catch (e) {
+      return Astro.redirect(`/tracker?error=${encodeURIComponent(e.message)}`);
+    }
+  }
+
+  if (action === 'delete') {
+    const id = formData.get('id') as string;
+    await deleteManualEntry(id);
+    return Astro.redirect('/tracker');
+  }
+}
+
+const entries = await getManualEntries(user.id);
+const activeTimer = await getActiveTimer(user.id);
+const totalSeconds = entries.reduce((acc, e) => acc + e.durationSeconds, 0);
+
+const formatTo12hr = (timeStr: string) => {
+  if (!timeStr) return '';
+  const [h, m] = timeStr.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hour = h % 12 || 12;
+  return `${hour}:${String(m).padStart(2, '0')} ${ampm}`;
+};
+---
+
+<Layout>
+  <Header user={user} />
+  <div id="portal-body">
+    <Sidebar user={user} activeTab="tracker" />
+    <main id="portal-main">
+      <div class="bg-grid" aria-hidden="true"></div>
+      <div class="bg-glow" aria-hidden="true"></div>
+      
+      <div id="tracker-content">
+        <div class="page-header">
+          <h1>Time <span class="accent">Tracker</span></h1>
+          <p>Precision internship logging with professional progress tracking.</p>
+        </div>
+
+        {userInClockify ? (
+          <div class="clockify-warning">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <div>
+              <h3>External Sync Active</h3>
+              <p>Manual tracking is currently locked because you are synced with the Clockify workspace.</p>
+            </div>
+          </div>
+        ) : (
+          <div class="tracker-layout">
+            
+            <!-- Main Timer Section -->
+            <section class={`main-control ${activeTimer ? 'timer-active' : ''}`} data-start={activeTimer?.startTime}>
+              <form method="POST" class="control-form" id="timer-main-form">
+                <div class="task-input-wrapper">
+                  <label class="field-label">CURRENT TASK</label>
+                  <input 
+                    type="text" 
+                    name="description" 
+                    placeholder="Enter what you are working on..." 
+                    value={activeTimer?.description || ''} 
+                    autocomplete="off"
+                    class="main-task-input"
+                  />
+                </div>
+                
+                <div class="time-display-wrapper">
+                  {activeTimer && (
+                    <div class="edit-start-box">
+                      <label class="field-label">STARTED AT</label>
+                      <input 
+                        type="time" 
+                        name="startTime" 
+                        class="inline-time-input"
+                        value={new Date(activeTimer.startTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} 
+                        onchange="document.getElementById('action-hidden').value='update-start'; this.form.submit();"
+                      />
+                    </div>
+                  )}
+                  
+                  <div class="elapsed-box">
+                    <label class="field-label">RENDERED TIME</label>
+                    <span id="live-timer-val" class="live-digits">00:00:00</span>
+                  </div>
+
+                  <input type="hidden" name="action" id="action-hidden" value={activeTimer ? "stop-timer" : "start-timer"} />
+
+                  <div class="button-box">
+                    {activeTimer ? (
+                      <button type="submit" onclick="document.getElementById('action-hidden').value='stop-timer'" class="btn-primary stop">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                        STOP TASK
+                      </button>
+                    ) : (
+                      <button type="submit" onclick="document.getElementById('action-hidden').value='start-timer'" class="btn-primary start">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
+                        START TIMER
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </form>
+            </section>
+
+            <!-- Metrics & History Grid -->
+            <div class="content-grid">
+              <!-- Left: History -->
+              <div class="history-column">
+                <h2 class="column-title">Activity Logs</h2>
+                <div class="log-list">
+                  {entries.length > 0 ? entries.sort((a,b) => b.date.localeCompare(a.date)).map(entry => (
+                    <div class="log-card">
+                      <div class="log-info">
+                        <span class="log-title">{entry.description || 'General Work'}</span>
+                        <div class="log-sub">
+                          <span class="date">{new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                          <span class="dot">·</span>
+                          <span class="time">{formatTo12hr(entry.startTime)} — {formatTo12hr(entry.endTime)}</span>
+                        </div>
+                      </div>
+                      <div class="log-actions">
+                        <span class="log-hours">{(entry.durationSeconds / 3600).toFixed(2)}h</span>
+                        <form method="POST">
+                          <input type="hidden" name="action" value="delete" />
+                          <input type="hidden" name="id" value={entry.id} />
+                          <button type="submit" class="delete-icon" title="Remove Entry">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+                  )) : (
+                    <div class="empty-list">No manual logs recorded yet.</div>
+                  )}
+                </div>
+              </div>
+
+              <!-- Right: Sidebar Tools -->
+              <div class="sidebar-column">
+                <div class="stats-box">
+                  <div class="stat-item">
+                    <span class="field-label">TOTAL RENDERED</span>
+                    <div class="stat-value">{(totalSeconds / 3600).toFixed(2)}<span class="stat-unit"> hrs</span></div>
+                  </div>
+                </div>
+
+                <div class="manual-add-box">
+                  <h3 class="box-title">Manual Adjustment</h3>
+                  <form method="POST" class="side-form">
+                    <input type="hidden" name="action" value="add" />
+                    <div class="input-group">
+                      <label>Task Description</label>
+                      <input type="text" name="description" placeholder="What did you do?" required />
+                    </div>
+                    <div class="input-group">
+                      <label>Date</label>
+                      <input type="date" name="date" value={new Date().toISOString().split('T')[0]} required />
+                    </div>
+                    <div class="input-row">
+                      <div class="input-group">
+                        <label>Start</label>
+                        <input type="time" name="startTime" required />
+                      </div>
+                      <div class="input-group">
+                        <label>End</label>
+                        <input type="time" name="endTime" required />
+                      </div>
+                    </div>
+                    <button type="submit" class="btn-outline">Add Entry</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<script is:inline>
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('success')) window.showToast('Data updated');
+  if (params.get('error')) window.showToast(decodeURIComponent(params.get('error')), 'error');
+
+  const timerSection = document.querySelector('.main-control');
+  const timerVal = document.getElementById('live-timer-val');
+  if (timerSection && timerSection.classList.contains('timer-active')) {
+    const startTime = new Date(timerSection.dataset.start || '').getTime();
+    if (startTime) {
+      setInterval(() => {
+        const diff = Math.max(0, new Date().getTime() - startTime);
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        timerVal.textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      }, 1000);
+    }
+  }
+</script>
+
+<style>
+  #portal-body { display: flex; min-height: 100vh; padding-top: 56px; }
+  #portal-main { margin-left: 220px; flex: 1; padding: 40px; position: relative; font-family: 'Outfit', sans-serif; }
+  
+  .bg-grid { position: fixed; inset: 0; background-image: linear-gradient(rgba(237, 102, 33, .04) 1px, transparent 1px), linear-gradient(90deg, rgba(237, 102, 33, .04) 1px, transparent 1px); background-size: 40px 40px; pointer-events: none; }
+  .bg-glow { position: fixed; top: 10%; right: 10%; width: 400px; height: 400px; background: radial-gradient(circle, rgba(237, 102, 33, 0.08) 0%, transparent 70%); pointer-events: none; }
+  
+  #tracker-content { position: relative; z-index: 1; max-width: 1000px; animation: cin .5s cubic-bezier(.16,1,.3,1) both; }
+  @keyframes cin { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+
+  .page-header { margin-bottom: 32px; }
+  .page-header h1 { font-size: 28px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; font-family: 'Outfit', sans-serif; }
+  .accent { background: var(--ntv-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .page-header p { font-size: 14px; color: var(--text-secondary); margin-top: 4px; }
+
+  /* Main Control Section */
+  .main-control { 
+    background: rgba(13, 20, 33, 0.6); 
+    border: 1px solid var(--border-subtle); 
+    border-radius: 14px; 
+    padding: 24px 28px; 
+    margin-bottom: 32px;
+    backdrop-filter: blur(16px);
+    transition: 0.3s;
+  }
+  .timer-active { border-color: rgba(237, 102, 33, 0.4); background: rgba(237, 102, 33, 0.04); box-shadow: 0 0 32px rgba(237, 102, 33, 0.05); }
+
+  .control-form { display: flex; flex-direction: column; gap: 20px; }
+  .field-label { display: block; font-size: 11px; font-weight: 600; color: var(--text-secondary); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; font-family: 'Outfit', sans-serif; }
+
+  .main-task-input { 
+    width: 100%; background: transparent; border: none; font-size: 20px; font-weight: 600;
+    color: white; outline: none; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;
+    font-family: 'Outfit', sans-serif;
+  }
+  .main-task-input:focus { border-bottom-color: var(--ntv-orange); }
+
+  .time-display-wrapper { display: flex; align-items: flex-end; gap: 40px; }
+  .elapsed-box { flex: 1; }
+  .live-digits { font-family: 'JetBrains Mono', monospace; font-size: 32px; font-weight: 700; color: white; line-height: 1; }
+  .timer-active .live-digits { color: var(--ntv-orange); }
+
+  .inline-time-input { 
+    background: rgba(255,255,255,0.05); border: 1px solid var(--border-subtle); border-radius: 8px;
+    color: var(--ntv-orange); font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600;
+    padding: 6px 10px; cursor: pointer; outline: none;
+  }
+
+  .btn-primary { 
+    display: flex; align-items: center; gap: 10px; padding: 12px 28px; 
+    border: none; border-radius: 10px; font-weight: 800; cursor: pointer; transition: 0.2s;
+    font-size: 13px; letter-spacing: 0.02em;
+  }
+  .btn-primary.start { background: var(--ntv-gradient); color: white; }
+  .btn-primary.stop { background: #ef4444; color: white; }
+  .btn-primary:hover { transform: translateY(-1px); filter: brightness(1.1); }
+
+  /* Grid Layout */
+  .content-grid { display: grid; grid-template-columns: 1.8fr 1fr; gap: 32px; }
+  
+  .column-title { font-size: 15px; font-weight: 600; color: var(--ntv-orange); letter-spacing: .04em; margin-bottom: 16px; }
+  
+  .log-list { display: flex; flex-direction: column; gap: 0; }
+  .log-card { 
+    background: rgba(5, 11, 22, 0.6); border: 1px solid var(--border-subtle); 
+    border-bottom: none; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;
+    transition: background .15s;
+  }
+  .log-card:first-child { border-radius: 12px 12px 0 0; }
+  .log-card:last-child { border-radius: 0 0 12px 12px; border-bottom: 1px solid var(--border-subtle); }
+  .log-card:hover { background: rgba(237, 102, 33, 0.04); }
+  
+  .log-title { font-size: 14px; font-weight: 600; color: white; display: block; margin-bottom: 4px; }
+  .log-sub { font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; }
+  .dot { opacity: 0.3; }
+
+  .log-actions { display: flex; align-items: center; gap: 20px; }
+  .log-hours { font-size: 16px; font-weight: 700; color: var(--ntv-orange); font-family: 'JetBrains Mono', monospace; }
+  .delete-icon { background: none; border: none; color: #f87171; cursor: pointer; opacity: 0.4; transition: 0.2s; padding: 4px; }
+  .delete-icon:hover { opacity: 1; transform: scale(1.1); }
+
+  /* Sidebar Column */
+  .stats-box { background: var(--card-bg); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 20px 22px; margin-bottom: 24px; transition: border-color .2s; }
+  .stats-box:hover { border-color: var(--ntv-orange); }
+  .stat-value { font-size: 28px; font-weight: 700; color: white; margin-top: 4px; }
+  .stat-unit { font-size: 13px; font-weight: 400; color: var(--text-secondary); }
+
+  .manual-add-box { background: var(--card-bg); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 24px; }
+  .box-title { font-size: 13px; font-weight: 700; color: white; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.05em; }
+  
+  .side-form { display: flex; flex-direction: column; gap: 14px; }
+  .input-group label { display: block; font-size: 10px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 6px; }
+  .input-group input { 
+    width: 100%; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle);
+    border-radius: 8px; padding: 10px 12px; color: white; font-size: 13px;
+  }
+  .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  
+  .btn-outline { 
+    margin-top: 4px; background: transparent; border: 1px solid var(--ntv-orange); 
+    color: var(--ntv-orange); padding: 10px; border-radius: 8px; font-weight: 700;
+    cursor: pointer; transition: 0.2s; font-size: 12px;
+  }
+  .btn-outline:hover { background: var(--ntv-orange); color: white; }
+
+  @media (max-width: 900px) {
+    .content-grid { grid-template-columns: 1fr; }
+    .time-display-wrapper { flex-direction: column; align-items: flex-start; gap: 24px; }
+    .btn-primary { width: 100%; justify-content: center; }
+  }
+</style>

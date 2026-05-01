@@ -7,6 +7,7 @@ import { parse } from 'cookie';
 import { getClockifyUser, getRenderedHours } from '../lib/clockify';
 
 import { getAppSettings } from '../lib/settings';
+import { getManualEntries } from '../lib/entries';
 
 const cookieHeader = Astro.request.headers.get('cookie') || '';
 const cookies = parse(cookieHeader);
@@ -18,30 +19,88 @@ if (!user) {
 
 // Fetch App Settings
 const settings = await getAppSettings();
+const isClockifySet = !!(import.meta.env.CLOCKIFY_API_KEY && import.meta.env.CLOCKIFY_WORKSPACE_ID);
 
-// Fetch Clockify data
+// Fetch data (Clockify or Manual)
 let renderedHours = 0;
 let monthlyData = [];
 let clockifyError = null;
+let isUsingManual = false;
 
-try {
-  const clockifyUser = await getClockifyUser(user.email);
-  if (clockifyUser) {
-    const data = await getRenderedHours(clockifyUser.id, settings.startDate);
-    renderedHours = data.totalHours;
-    monthlyData = data.monthlyBreakdown;
-  } else {
-    clockifyError = 'User not found in Clockify workspace';
+if (isClockifySet) {
+  try {
+    const clockifyUser = await getClockifyUser(user.email);
+    if (clockifyUser) {
+      const data = await getRenderedHours(clockifyUser.id, settings.startDate);
+      renderedHours = data.totalHours;
+      monthlyData = data.monthlyBreakdown;
+    } else {
+      isUsingManual = true;
+    }
+  } catch (err) {
+    console.error('Clockify sync error:', err);
+    clockifyError = err.message;
+    isUsingManual = true; // Fallback on error too
   }
-} catch (err) {
-  console.error('Clockify sync error:', err);
-  clockifyError = err.message;
+} else {
+  isUsingManual = true;
+}
+
+if (isUsingManual) {
+  // Manual Fallback
+  const manualEntries = await getManualEntries(user.id);
+  const filtered = manualEntries.filter(e => new Date(e.date) >= new Date(settings.startDate));
+  renderedHours = filtered.reduce((acc, e) => acc + e.durationSeconds, 0) / 3600;
+  
+  // Group manual entries by month for the table
+  const monthlyMap: Record<string, number> = {};
+  filtered.forEach(e => {
+    const monthKey = e.date.substring(0, 7); // YYYY-MM
+    monthlyMap[monthKey] = (monthlyMap[monthKey] || 0) + e.durationSeconds;
+  });
+  monthlyData = Object.entries(monthlyMap).map(([month, seconds]) => ({
+    month,
+    hours: seconds / 3600
+  })).sort((a,b) => b.month.localeCompare(a.month));
 }
 
 // Compute countdown (using static target for now, or could add targetDate to settings)
 const targetDate = new Date('2026-05-12T00:00:00+08:00');
 const now = new Date();
 const daysLeft = Math.max(0, Math.ceil((targetDate.getTime() - now.getTime()) / 86400000));
+
+const formatTo12hr = (timeStr: string) => {
+  if (!timeStr) return '';
+  const [h, m] = timeStr.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hour = h % 12 || 12;
+  return `${hour}:${String(m).padStart(2, '0')} ${ampm}`;
+};
+
+// Fetch recent activity (Clockify or Manual)
+let activity = [];
+if (!isUsingManual) {
+  try {
+    const { getRecentEntries } = await import('../lib/clockify');
+    const clockifyUser = await getClockifyUser(user.email);
+    if (clockifyUser) {
+      activity = await getRecentEntries(clockifyUser.id);
+    }
+  } catch (err) {
+    console.error('Activity sync error:', err);
+  }
+} else {
+  // Manual Activity
+  const manualEntries = await getManualEntries(user.id);
+  activity = manualEntries
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 4)
+    .map(e => ({
+      description: e.description,
+      startTime: `${e.date} ${formatTo12hr(e.startTime)}`,
+      duration: e.durationSeconds
+    }));
+}
 ---
 <Layout>
   <Header user={user} />
@@ -56,7 +115,7 @@ const daysLeft = Math.max(0, Math.ceil((targetDate.getTime() - now.getTime()) / 
       <div id="dash-content">
         <div class="dash-greeting">
           <h1>Welcome back, <span class="accent">{user.name?.split(' ')[0]}</span></h1>
-          <p>Here's your allowance overview for the current program cycle.</p>
+          <p>Here's your progress overview for the current internship cycle.</p>
         </div>
 
         <div class="metrics-grid">
@@ -90,7 +149,7 @@ const daysLeft = Math.max(0, Math.ceil((targetDate.getTime() - now.getTime()) / 
                 <tr>
                   <th>Month</th>
                   <th>Hours Rendered</th>
-                  <th>Total Allowance</th>
+                  <th>Total Estimate</th>
                 </tr>
               </thead>
               <tbody>
@@ -117,25 +176,29 @@ const daysLeft = Math.max(0, Math.ceil((targetDate.getTime() - now.getTime()) / 
         <div class="activity-section">
           <h2 class="section-title">Recent Activity</h2>
           <div class="activity-list">
-            <div class="activity-item">
-              <div class="activity-dot"></div>
-              <div class="activity-content">
-                <span class="activity-text">Authenticated via Google OAuth</span>
-                <span class="activity-time">Just now</span>
+            {activity.length > 0 ? activity.map(item => (
+              <div class="activity-item">
+                <div class="activity-dot"></div>
+                <div class="activity-content">
+                  <div class="activity-text">{item.description || 'Working on tasks'}</div>
+                  <div class="activity-time">{item.startTime} • {(item.duration / 3600).toFixed(2)}h</div>
+                </div>
               </div>
-            </div>
-            <div class="activity-item">
-              <div class="activity-dot"></div>
-              <div class="activity-content">
-                <span class="activity-text">{clockifyError ? 'Clockify sync failed' : 'Clockify data synced successfully'}</span>
-                <span class="activity-time">{clockifyError ? 'Check credentials' : 'Live'}</span>
+            )) : (
+              <div class="activity-item">
+                <div class="activity-dot muted"></div>
+                <div class="activity-content">
+                  <div class="activity-text">No recent activity found</div>
+                  <div class="activity-time">Once you log time, it will appear here.</div>
+                </div>
               </div>
-            </div>
+            )}
+            
             <div class="activity-item">
               <div class="activity-dot muted"></div>
               <div class="activity-content">
-                <span class="activity-text">Program cycle started</span>
-                <span class="activity-time">System event</span>
+                <div class="activity-text">Session started via Google Auth</div>
+                <div class="activity-time">System • Active</div>
               </div>
             </div>
           </div>
