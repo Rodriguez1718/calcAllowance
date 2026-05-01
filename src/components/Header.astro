@@ -67,6 +67,10 @@ const { user } = Astro.props;
   }
   .logout-btn:hover { background: var(--ntv-red); color: white; transform: scale(1.05); }
 
+  @media print {
+    #sys-header { display: none !important; }
+  }
+
   .menu-toggle { display: none; background: none; border: none; color: var(--text-primary); cursor: pointer; padding: 4px; border-radius: 6px; }
   .menu-toggle:hover { background: rgba(255,255,255,0.05); }
 

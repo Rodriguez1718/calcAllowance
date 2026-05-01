@@ -140,6 +140,10 @@ const navItems = [
   .sidebar-footer { margin-top: auto; padding: 0 4px; }
   .sidebar-version { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: rgba(255, 255, 255, 0.2); letter-spacing: .06em; }
 
+  @media print {
+    #sidebar { display: none !important; }
+  }
+
   @media (min-width: 901px) {
     #sidebar { top: 56px; } /* Desktop behavior */
   }

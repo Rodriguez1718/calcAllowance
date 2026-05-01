@@ -27,7 +27,7 @@ const year = parseInt(Astro.url.searchParams.get('year') || currentYear.toString
 
 const isClockifySet = !!(import.meta.env.CLOCKIFY_API_KEY && import.meta.env.CLOCKIFY_WORKSPACE_ID);
 
-let dtrData = {};
+let dtrData: any = {};
 let totalMonthSeconds = 0;
 let clockifyError = null;
 let isUsingManual = false;
@@ -45,12 +45,12 @@ if (isClockifySet) {
     const clockifyUser = await getClockifyUser(user.email);
     if (clockifyUser) {
       dtrData = await getDailyDTR(clockifyUser.id, year, month);
-      totalMonthSeconds = Object.values(dtrData).reduce((acc, day) => acc + day.totalSeconds, 0);
+      totalMonthSeconds = Object.values(dtrData).reduce((acc: number, day: any) => acc + day.totalSeconds, 0);
     } else {
       isUsingManual = true;
     }
   } catch (err) {
-    clockifyError = err.message;
+    clockifyError = (err as Error).message;
     isUsingManual = true;
   }
 } else {
@@ -87,7 +87,7 @@ if (isUsingManual) {
     dtrData[day].totalSeconds += e.durationSeconds;
   });
 
-  totalMonthSeconds = Object.values(dtrData).reduce((acc, day) => acc + day.totalSeconds, 0);
+  totalMonthSeconds = Object.values(dtrData).reduce((acc: number, day: any) => acc + day.totalSeconds, 0);
 }
 
 const formatDuration = (seconds: number) => {
@@ -289,23 +289,34 @@ const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month:
   .sig-label { font-weight: 700; white-space: nowrap; }
 
   @media print {
-    body * { visibility: hidden; }
+    @page { 
+      margin: 0.8cm;
+      size: A4 portrait;
+    }
+    
+    /* Hide nav elements */
     #sys-header, #sidebar, .no-print { display: none !important; }
-    .dtr-container, .dtr-container * { visibility: visible; }
+    
+    /* Reset layout for print */
+    #portal-body { 
+      display: block !important; 
+      padding: 0 !important; 
+      min-height: auto !important; 
+    }
+    
+    #portal-main { 
+      margin: 0 !important; 
+      padding: 0 !important; 
+    }
+    
+    /* DTR container */
     .dtr-container { 
-      position: absolute;
-      left: 0;
-      top: 0;
       width: 100% !important;
       max-width: 100% !important;
       box-shadow: none !important;
       padding: 0 !important;
       margin: 0 !important;
       border-radius: 0 !important;
-    }
-    @page { 
-      margin: 1cm;
-      size: A4 portrait;
     }
   }
 
