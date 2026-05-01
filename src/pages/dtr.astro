@@ -238,7 +238,22 @@ const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month:
   }
 
   .actions-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; max-width: 800px; margin-left: auto; margin-right: auto; }
-  .month-selector select { background: rgba(255,255,255,0.05); border: 1px solid var(--border-subtle); color: white; padding: 8px 12px; border-radius: 6px; outline: none; }
+  .month-selector select { 
+    background: rgba(255,255,255,0.05); 
+    border: 1px solid var(--border-subtle); 
+    color: white; 
+    padding: 8px 12px; 
+    border-radius: 6px; 
+    outline: none;
+    font-size: 14px;
+    font-weight: 500;
+  }
+  
+  .month-selector select option {
+    background: #1a1a2e;
+    color: white;
+    padding: 8px;
+  }
   
   .print-btn { 
     display: flex; align-items: center; gap: 8px; background: var(--ntv-gradient); color: white; border: none; 
