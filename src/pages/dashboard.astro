@@ -1,0 +1,286 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getSession } from '../lib/auth';
+import { parse } from 'cookie';
+
+const cookieHeader = Astro.request.headers.get('cookie') || '';
+const cookies = parse(cookieHeader);
+const user = cookies.session ? getSession(cookies.session) : null;
+
+if (!user) {
+  return Astro.redirect('/');
+}
+
+// Compute countdown
+const targetDate = new Date('2026-05-12T00:00:00+08:00');
+const now = new Date();
+const daysLeft = Math.max(0, Math.ceil((targetDate.getTime() - now.getTime()) / 86400000));
+---
+<Layout>
+  <header id="sys-header">
+    <div class="header-left">
+      <div class="logo-mark">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L3 7V12C3 16.55 6.84 20.74 12 22C17.16 20.74 21 16.55 21 12V7L12 2Z" fill="url(#lg2)"/>
+          <path d="M9 12L11 14L15 10" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <defs><linearGradient id="lg2" x1="3" y1="2" x2="21" y2="22" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#8b5cf6"/></linearGradient></defs>
+        </svg>
+      </div>
+      <div class="logo-text">
+        <span class="logo-primary">IDRIS</span>
+        <span class="logo-sep">×</span>
+        <span class="logo-secondary">Allowance</span>
+      </div>
+    </div>
+    <div class="header-center">
+      <div class="clock-wrapper">
+        <span class="pulse-dot green"></span>
+        <span id="live-clock" class="live-clock">--:--:-- --</span>
+        <span class="clock-tz">PHT</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="user-info">
+        {user.picture && <img class="avatar" src={user.picture} alt={user.name} width="28" height="28" />}
+        <span class="user-name">{user.name?.split(' ')[0]}</span>
+        <a href="/api/auth/logout" class="logout-btn" title="Sign out">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><polyline points="16,17 21,12 16,7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <div id="portal-body">
+    <!-- SIDEBAR (Unlocked) -->
+    <aside id="sidebar">
+      <div class="sidebar-user">
+        {user.picture && <img class="sidebar-avatar" src={user.picture} alt="" width="32" height="32" />}
+        <div>
+          <div class="sidebar-name">{user.name}</div>
+          <div class="sidebar-email">{user.email}</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/dashboard" class="nav-item active-nav">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.7"/></svg>
+          <span>Dashboard</span>
+        </a>
+        <a href="#" class="nav-item">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4 4v5h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 20v-5h-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.93 15a8 8 0 1 0 .67-8.37L4 11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Sync Logs</span>
+        </a>
+        <a href="#" class="nav-item">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M18 20V10M12 20V4M6 20v-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          <span>Team Metrics</span>
+        </a>
+        <a href="#" class="nav-item">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" stroke="currentColor" stroke-width="1.7"/></svg>
+          <span>Settings</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-version">v1.0.4-stable</div>
+      </div>
+    </aside>
+
+    <!-- MAIN DASHBOARD -->
+    <main id="portal-main">
+      <div class="bg-grid" aria-hidden="true"></div>
+      <div class="bg-glow" aria-hidden="true"></div>
+
+      <div id="dash-content">
+        <div class="dash-greeting">
+          <h1>Welcome back, <span class="accent">{user.name?.split(' ')[0]}</span></h1>
+          <p>Here's your allowance overview for the current program cycle.</p>
+        </div>
+
+        <!-- UNLOCKED METRICS -->
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-label">Active Rate</div>
+            <div class="metric-value">₱60.00<span class="metric-unit"> / hr</span></div>
+            <div class="metric-sub">Current multiplier · updated weekly</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Target Date</div>
+            <div class="metric-value">{daysLeft}<span class="metric-unit"> days</span></div>
+            <div class="metric-sub">May 12, 2026 · program deadline</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Your Hours</div>
+            <div class="metric-value">0.00<span class="metric-unit"> / 480 hrs</span></div>
+            <div class="metric-sub">Sync from Clockify to update</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Team Status</div>
+            <div class="metric-value">3<span class="metric-unit"> active</span></div>
+            <div class="metric-sub">Developers online this session</div>
+          </div>
+        </div>
+
+        <!-- RECENT ACTIVITY -->
+        <div class="activity-section">
+          <h2 class="section-title">Recent Activity</h2>
+          <div class="activity-list">
+            <div class="activity-item">
+              <div class="activity-dot"></div>
+              <div class="activity-content">
+                <span class="activity-text">Authenticated via Google OAuth</span>
+                <span class="activity-time">Just now</span>
+              </div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-dot muted"></div>
+              <div class="activity-content">
+                <span class="activity-text">Clockify workspace linked</span>
+                <span class="activity-time">Pending first sync</span>
+              </div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-dot muted"></div>
+              <div class="activity-content">
+                <span class="activity-text">Program cycle started</span>
+                <span class="activity-time">System event</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<script>
+  function tick() {
+    const pht = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+    const h = pht.getHours(), m = String(pht.getMinutes()).padStart(2,'0'), s = String(pht.getSeconds()).padStart(2,'0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const el = document.getElementById('live-clock');
+    if (el) el.textContent = `${String(h%12||12).padStart(2,'0')}:${m}:${s} ${ampm}`;
+  }
+  tick(); setInterval(tick, 1000);
+</script>
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* HEADER */
+  #sys-header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; height: 56px;
+    background: rgba(9,10,18,0.88); backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(99,102,241,0.15);
+  }
+  .header-left { display: flex; align-items: center; gap: 10px; }
+  .logo-mark { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.3); border-radius: 8px; }
+  .logo-text { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; }
+  .logo-primary { color: #a5b4fc; font-weight: 700; letter-spacing: .08em; }
+  .logo-sep { color: rgba(255,255,255,.22); font-weight: 300; }
+  .logo-secondary { color: rgba(226,232,240,.6); font-weight: 400; }
+  .clock-wrapper { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 20px; padding: 5px 14px; }
+  .live-clock { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #e2e8f0; letter-spacing: .06em; }
+  .clock-tz { font-size: 10px; font-weight: 600; color: rgba(165,180,252,.7); letter-spacing: .1em; background: rgba(99,102,241,.15); padding: 2px 6px; border-radius: 4px; }
+  .pulse-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; animation: pdot 2s ease-in-out infinite; }
+  .green { background: #34d399; box-shadow: 0 0 7px #34d399; }
+  @keyframes pdot { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+  .user-info { display: flex; align-items: center; gap: 10px; }
+  .avatar { border-radius: 50%; border: 2px solid rgba(99,102,241,.4); }
+  .user-name { font-size: 13px; font-weight: 600; color: #a5b4fc; }
+  .logout-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 8px;
+    background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.2);
+    color: #f87171; text-decoration: none; transition: all .2s;
+  }
+  .logout-btn:hover { background: rgba(239,68,68,.2); transform: scale(1.05); }
+
+  /* BODY */
+  #portal-body { display: flex; min-height: 100vh; padding-top: 56px; }
+
+  /* SIDEBAR UNLOCKED */
+  #sidebar {
+    position: fixed; left: 0; top: 56px; bottom: 0; width: 220px;
+    background: rgba(10,11,22,0.88); backdrop-filter: blur(16px);
+    border-right: 1px solid rgba(99,102,241,0.12);
+    display: flex; flex-direction: column; padding: 20px 12px; gap: 6px;
+  }
+  .sidebar-user {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px; background: rgba(99,102,241,.06);
+    border: 1px solid rgba(99,102,241,.14);
+    border-radius: 10px; margin-bottom: 16px;
+  }
+  .sidebar-avatar { border-radius: 50%; border: 2px solid rgba(99,102,241,.3); }
+  .sidebar-name { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+  .sidebar-email { font-size: 10px; color: rgba(148,163,184,.55); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
+  .sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 11px; padding: 10px 12px;
+    border-radius: 8px; font-size: 13px; font-weight: 500;
+    color: rgba(148,163,184,.65); text-decoration: none;
+    cursor: pointer; transition: all .2s;
+  }
+  .nav-item:hover { background: rgba(99,102,241,.08); color: #a5b4fc; }
+  .nav-item.active-nav {
+    background: rgba(99,102,241,.14); color: #a5b4fc;
+    border: 1px solid rgba(99,102,241,.22);
+  }
+  .sidebar-footer { margin-top: auto; padding: 0 4px; }
+  .sidebar-version { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: rgba(100,116,139,.4); letter-spacing: .06em; }
+
+  /* MAIN */
+  #portal-main {
+    margin-left: 220px; flex: 1;
+    min-height: calc(100vh - 56px);
+    position: relative; padding: 40px 40px;
+  }
+  .bg-grid { position: fixed; inset: 0; background-image: linear-gradient(rgba(99,102,241,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,.04) 1px, transparent 1px); background-size: 40px 40px; pointer-events: none; z-index: 0; }
+  .bg-glow { position: fixed; top: 20%; left: 55%; transform: translateX(-50%); width: 560px; height: 360px; background: radial-gradient(ellipse, rgba(99,102,241,.08) 0%, transparent 70%); pointer-events: none; z-index: 0; }
+
+  /* DASHBOARD CONTENT */
+  #dash-content { position: relative; z-index: 1; max-width: 900px; animation: cin .5s cubic-bezier(.16,1,.3,1) both; }
+  @keyframes cin { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+
+  .dash-greeting { margin-bottom: 32px; }
+  .dash-greeting h1 { font-size: 28px; font-weight: 700; color: #f1f5f9; margin-bottom: 6px; }
+  .dash-greeting p { font-size: 14px; color: rgba(148,163,184,.7); }
+  .accent { background: linear-gradient(135deg,#818cf8,#c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+  .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin-bottom: 36px; }
+  .metric-card {
+    background: rgba(13,14,26,.8); border: 1px solid rgba(99,102,241,.16);
+    border-radius: 14px; padding: 20px 22px; transition: border-color .2s, transform .2s;
+  }
+  .metric-card:hover { border-color: rgba(99,102,241,.35); transform: translateY(-2px); }
+  .metric-label { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: rgba(148,163,184,.55); margin-bottom: 10px; }
+  .metric-value { font-size: 28px; font-weight: 700; color: #e2e8f0; letter-spacing: -.02em; line-height: 1; }
+  .metric-unit { font-size: 13px; font-weight: 400; color: rgba(148,163,184,.6); }
+  .metric-sub { font-size: 11px; color: rgba(100,116,139,.65); margin-top: 8px; }
+
+  .section-title { font-size: 15px; font-weight: 600; color: rgba(165,180,252,.75); letter-spacing: .04em; margin-bottom: 16px; }
+  .activity-list { display: flex; flex-direction: column; gap: 0; }
+  .activity-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 18px; background: rgba(13,14,26,.6);
+    border: 1px solid rgba(99,102,241,.1);
+    border-bottom: none;
+    transition: background .15s;
+  }
+  .activity-item:first-child { border-radius: 12px 12px 0 0; }
+  .activity-item:last-child { border-radius: 0 0 12px 12px; border-bottom: 1px solid rgba(99,102,241,.1); }
+  .activity-item:hover { background: rgba(99,102,241,.06); }
+  .activity-dot { width: 8px; height: 8px; border-radius: 50%; background: #34d399; box-shadow: 0 0 6px rgba(52,211,153,.4); flex-shrink: 0; }
+  .activity-dot.muted { background: rgba(100,116,139,.4); box-shadow: none; }
+  .activity-content { display: flex; justify-content: space-between; flex: 1; align-items: center; }
+  .activity-text { font-size: 13px; color: #cbd5e1; }
+  .activity-time { font-size: 11px; color: rgba(100,116,139,.6); font-family: 'JetBrains Mono', monospace; }
+
+  @media (max-width: 640px) {
+    #sidebar { display: none; }
+    #portal-main { margin-left: 0; padding: 24px 16px; }
+    .metrics-grid { grid-template-columns: 1fr; }
+    .logo-secondary, .logo-sep { display: none; }
+  }
+</style>
