@@ -12,9 +12,9 @@ const { user } = Astro.props;
       </svg>
     </div>
     <div class="logo-text">
-      <span class="logo-primary">IDRIS</span>
-      <span class="logo-sep">×</span>
-      <span class="logo-secondary">Allowance</span>
+      <span class="logo-primary">NTV</span>
+      <span class="logo-sep">/</span>
+      <span class="logo-secondary">IDRIS Portal</span>
     </div>
   </div>
   <div class="header-center">
@@ -40,32 +40,32 @@ const { user } = Astro.props;
     position: fixed; top: 0; left: 0; right: 0; z-index: 100;
     display: flex; align-items: center; justify-content: space-between;
     padding: 0 24px; height: 56px;
-    background: rgba(9,10,18,0.88); backdrop-filter: blur(16px);
-    border-bottom: 1px solid rgba(99,102,241,0.15);
+    background: rgba(5, 11, 22, 0.88); backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border-subtle);
   }
   .header-left { display: flex; align-items: center; gap: 10px; }
-  .logo-mark { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.3); border-radius: 8px; }
+  .logo-mark { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; background: rgba(237, 102, 33, 0.12); border: 1px solid var(--ntv-orange); border-radius: 8px; }
   .logo-text { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; }
-  .logo-primary { color: #a5b4fc; font-weight: 700; letter-spacing: .08em; }
+  .logo-primary { color: var(--ntv-orange); font-weight: 800; letter-spacing: .08em; }
   .logo-sep { color: rgba(255,255,255,.22); font-weight: 300; }
-  .logo-secondary { color: rgba(226,232,240,.6); font-weight: 400; }
-  .clock-wrapper { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 20px; padding: 5px 14px; }
-  .live-clock { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #e2e8f0; letter-spacing: .06em; }
-  .clock-tz { font-size: 10px; font-weight: 600; color: rgba(165,180,252,.7); letter-spacing: .1em; background: rgba(99,102,241,.15); padding: 2px 6px; border-radius: 4px; }
+  .logo-secondary { color: var(--text-secondary); font-weight: 400; }
+  .clock-wrapper { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.04); border: 1px solid var(--border-subtle); border-radius: 20px; padding: 5px 14px; }
+  .live-clock { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: var(--text-primary); letter-spacing: .06em; }
+  .clock-tz { font-size: 10px; font-weight: 600; color: var(--ntv-orange); letter-spacing: .1em; background: rgba(237, 102, 33, 0.15); padding: 2px 6px; border-radius: 4px; }
   .pulse-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; animation: pdot 2s ease-in-out infinite; }
   .green { background: #34d399; box-shadow: 0 0 7px #34d399; }
   @keyframes pdot { 0%,100%{opacity:1} 50%{opacity:.35} }
 
   .user-info { display: flex; align-items: center; gap: 10px; }
-  .avatar { border-radius: 50%; border: 2px solid rgba(99,102,241,.4); }
-  .user-name { font-size: 13px; font-weight: 600; color: #a5b4fc; }
+  .avatar { border-radius: 50%; border: 2px solid var(--ntv-orange); }
+  .user-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
   .logout-btn {
     display: flex; align-items: center; justify-content: center;
     width: 32px; height: 32px; border-radius: 8px;
-    background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.2);
+    background: rgba(230, 30, 42, 0.1); border: 1px solid rgba(230, 30, 42, 0.2);
     color: #f87171; text-decoration: none; transition: all .2s;
   }
-  .logout-btn:hover { background: rgba(239,68,68,.2); transform: scale(1.05); }
+  .logout-btn:hover { background: var(--ntv-red); color: white; transform: scale(1.05); }
 
   @media (max-width: 640px) {
     .logo-secondary, .logo-sep { display: none; }
