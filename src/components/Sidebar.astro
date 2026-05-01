@@ -36,33 +36,33 @@ const { user, activeTab } = Astro.props;
 <style>
   #sidebar {
     position: fixed; left: 0; top: 56px; bottom: 0; width: 220px;
-    background: rgba(10,11,22,0.88); backdrop-filter: blur(16px);
-    border-right: 1px solid rgba(99,102,241,0.12);
+    background: rgba(5, 11, 22, 0.88); backdrop-filter: blur(16px);
+    border-right: 1px solid var(--border-subtle);
     display: flex; flex-direction: column; padding: 20px 12px; gap: 6px;
   }
   .sidebar-user {
     display: flex; align-items: center; gap: 10px;
-    padding: 10px; background: rgba(99,102,241,.06);
-    border: 1px solid rgba(99,102,241,.14);
+    padding: 10px; background: rgba(237, 102, 33, 0.06);
+    border: 1px solid rgba(237, 102, 33, 0.14);
     border-radius: 10px; margin-bottom: 16px;
   }
-  .sidebar-avatar { border-radius: 50%; border: 2px solid rgba(99,102,241,.3); }
-  .sidebar-name { font-size: 13px; font-weight: 600; color: #e2e8f0; }
-  .sidebar-email { font-size: 10px; color: rgba(148,163,184,.55); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
+  .sidebar-avatar { border-radius: 50%; border: 2px solid var(--ntv-orange); }
+  .sidebar-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+  .sidebar-email { font-size: 10px; color: var(--text-secondary); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
   .sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
   .nav-item {
     display: flex; align-items: center; gap: 11px; padding: 10px 12px;
     border-radius: 8px; font-size: 13px; font-weight: 500;
-    color: rgba(148,163,184,.65); text-decoration: none;
+    color: var(--text-secondary); text-decoration: none;
     cursor: pointer; transition: all .2s;
   }
-  .nav-item:hover { background: rgba(99,102,241,.08); color: #a5b4fc; }
+  .nav-item:hover { background: rgba(237, 102, 33, 0.08); color: var(--ntv-orange); }
   .nav-item.active-nav {
-    background: rgba(99,102,241,.14); color: #a5b4fc;
-    border: 1px solid rgba(99,102,241,.22);
+    background: rgba(237, 102, 33, 0.14); color: var(--ntv-orange);
+    border: 1px solid rgba(237, 102, 33, 0.22);
   }
   .sidebar-footer { margin-top: auto; padding: 0 4px; }
-  .sidebar-version { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: rgba(100,116,139,.4); letter-spacing: .06em; }
+  .sidebar-version { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: rgba(255, 255, 255, 0.2); letter-spacing: .06em; }
 
   @media (max-width: 640px) {
     #sidebar { display: none; }
