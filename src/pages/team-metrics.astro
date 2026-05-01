@@ -90,7 +90,7 @@ if (isUsingManual) {
   totalMonthSeconds = Object.values(dtrData).reduce((acc, day) => acc + day.totalSeconds, 0);
 }
 
-const formatDuration = (seconds) => {
+const formatDuration = (seconds: number) => {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   return `${h}:${m.toString().padStart(2, '0')}`;
@@ -174,7 +174,7 @@ const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month:
             </tr>
           </thead>
           <tbody>
-            {Object.entries(dtrData).map(([day, data]) => (
+            {Object.entries(dtrData).map(([day, data]: [string, any]) => (
               <tr class={data.totalSeconds === 0 ? 'weekend-row' : ''}>
                 <td class="date-col">{day}</td>
                 <td>{data.amIn}</td>
@@ -274,11 +274,24 @@ const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month:
   .sig-label { font-weight: 700; white-space: nowrap; }
 
   @media print {
-    body { background: white !important; }
-    .no-print, header, aside { display: none !important; }
-    #portal-main { margin: 0 !important; padding: 0 !important; }
-    .dtr-container { box-shadow: none !important; width: 100% !important; padding: 0 !important; }
-    @page { margin: 1cm; }
+    body * { visibility: hidden; }
+    #sys-header, #sidebar, .no-print { display: none !important; }
+    .dtr-container, .dtr-container * { visibility: visible; }
+    .dtr-container { 
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100% !important;
+      max-width: 100% !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border-radius: 0 !important;
+    }
+    @page { 
+      margin: 1cm;
+      size: A4 portrait;
+    }
   }
 
   @media (max-width: 1000px) {
