@@ -64,9 +64,11 @@ export async function getRenderedHours(clockifyUserId: string, startDate?: strin
           const seconds = parseIsoDuration(entry.timeInterval.duration);
           totalSeconds += seconds;
 
-          // Monthly grouping
-          const date = new Date(entry.timeInterval.start);
-          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          // Monthly grouping in Manila time
+          const entryDate = new Date(entry.timeInterval.start);
+          const year = new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: 'Asia/Manila' }).format(entryDate);
+          const month = new Intl.DateTimeFormat('en-US', { month: '2-digit', timeZone: 'Asia/Manila' }).format(entryDate);
+          const monthKey = `${year}-${month}`;
           monthlyBreakdown[monthKey] = (monthlyBreakdown[monthKey] || 0) + seconds;
         }
       }
@@ -111,22 +113,27 @@ export async function getDailyDTR(clockifyUserId: string, year: number, month: n
   }
 
   for (const entry of entries) {
-    const startDate = new Date(entry.timeInterval.start);
-    const endDate = new Date(entry.timeInterval.end);
-    const day = startDate.getDate();
+    const start = new Date(entry.timeInterval.start);
+    const end = new Date(entry.timeInterval.end);
+    
+    // Get components in Manila time
+    const day = parseInt(new Intl.DateTimeFormat('en-US', { day: 'numeric', timeZone: 'Asia/Manila' }).format(start));
+    const hour = parseInt(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: 'Asia/Manila' }).format(start));
     const duration = parseIsoDuration(entry.timeInterval.duration);
     
     const timeStr = (date: Date) => date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Manila' });
 
-    dtr[day].totalSeconds += duration;
+    if (dtr[day]) {
+      dtr[day].totalSeconds += duration;
 
-    // Logic to categorize AM/PM (rough estimate: before 12:30pm is AM)
-    if (startDate.getHours() < 12) {
-      if (!dtr[day].amIn) dtr[day].amIn = timeStr(startDate);
-      dtr[day].amOut = timeStr(endDate);
-    } else {
-      if (!dtr[day].pmIn) dtr[day].pmIn = timeStr(startDate);
-      dtr[day].pmOut = timeStr(endDate);
+      // categorized by Manila hour
+      if (hour < 12) {
+        if (!dtr[day].amIn) dtr[day].amIn = timeStr(start);
+        dtr[day].amOut = timeStr(end);
+      } else {
+        if (!dtr[day].pmIn) dtr[day].pmIn = timeStr(start);
+        dtr[day].pmOut = timeStr(end);
+      }
     }
   }
 
