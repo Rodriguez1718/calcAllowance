@@ -14,7 +14,7 @@ export interface AppSettings {
   paySchedule: 'weekly' | 'semi-monthly' | 'monthly';
   role: 'student' | 'coordinator';
   inviteCode?: string;
-  coordinatorId?: string;
+  coordinatorId?: string | null;
   userName?: string;
   userEmail?: string;
   userPicture?: string;

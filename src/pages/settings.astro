@@ -53,13 +53,10 @@ const isLinked = settings.role === 'student' && !!settings.coordinatorId;
           {settings.role === 'student' && (
             <>
               <section class="settings-card">
-                <h2 class="card-title">OJT Details (For DTR Sheet)</h2>
+                <h2 class="card-title">Internship Configuration</h2>
                 <form action="/api/settings" method="POST" class="settings-form">
                   <input type="hidden" name="setupComplete" value="true" />
                   <input type="hidden" name="redirect" value="/settings" />
-                  <input type="hidden" name="startDate" value={settings.startDate} />
-                  <input type="hidden" name="targetHours" value={settings.targetHours} />
-                  <input type="hidden" name="hourlyRate" value={settings.hourlyRate} />
                   
                   <div class="form-row">
                     <div class="form-group">
@@ -83,56 +80,26 @@ const isLinked = settings.role === 'student' && !!settings.coordinatorId;
                       <input type="text" id="supervisorPosition" name="supervisorPosition" value={settings.supervisorPosition} placeholder="Enter position" required />
                     </div>
                   </div>
-                  <button type="submit" class="save-btn">Update DTR Details</button>
-                </form>
-              </section>
 
-              <section class="settings-card">
-                <h2 class="card-title">Coordinator Connection</h2>
-                <form action="/api/settings" method="POST" class="settings-form">
-                  <input type="hidden" name="setupComplete" value="true" />
-                  <input type="hidden" name="redirect" value="/settings" />
-                  
-                  {settings.coordinatorId ? (
-                    <div class="linked-info">
-                      <div class="link-status">
-                        <div class="status-dot pulse"></div>
-                        <span>Linked to <strong>{coordinatorName}</strong></span>
-                      </div>
-                      <p class="hint">Your coordinator can now view your progress and DTR logs.</p>
-                    </div>
-                  ) : (
-                    <div class="unlinked-info">
-                      <div class="link-status unlinked">
-                        <div class="status-dot gray"></div>
-                        <span>Not linked to a coordinator</span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div class="form-group mt-16">
-                    <label for="coordinatorInvite">Update Invite Code</label>
-                    <div class="input-with-btn">
-                      <input type="text" id="coordinatorInvite" name="coordinatorInvite" placeholder="Enter 6-digit code" />
-                      <button type="submit" class="apply-btn">Link</button>
-                    </div>
-                    <p class="form-hint">Paste the code given by your OJT Coordinator to sync your progress.</p>
-                  </div>
-                </form>
-              </section>
-
-              <section class="settings-card">
-                <h2 class="card-title">Program Configuration</h2>
-                <form action="/api/settings" method="POST" class="settings-form">
-                  <input type="hidden" name="setupComplete" value="true" />
-                  <input type="hidden" name="redirect" value="/settings" />
                   <div class="form-row split">
                     <div class="form-group">
-                      <label class="check-label">
-                        <input type="checkbox" name="hasAllowance" value="true" checked={settings.hasAllowance} id="allowance-toggle-settings" />
-                        <span>Enable Allowance Tracking</span>
-                      </label>
+                      <label for="startDate">Program Start Date</label>
+                      <input type="date" id="startDate" name="startDate" value={settings.startDate} required />
                     </div>
+                    <div class="form-group">
+                      <label for="targetHours">Target Hours</label>
+                      <div class="input-wrapper">
+                        <input type="number" id="targetHours" name="targetHours" value={settings.targetHours} step="0.5" required />
+                        <span class="input-suffix">hrs</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="allowance-header">
+                    <label class="check-label">
+                      <input type="checkbox" name="hasAllowance" value="true" checked={settings.hasAllowance} id="allowance-toggle-settings" />
+                      <span class="toggle-text">Enable Allowance Tracking</span>
+                    </label>
                   </div>
 
                   <div id="allowance-fields-settings" style={settings.hasAllowance ? "" : "display: none;"}>
@@ -165,24 +132,7 @@ const isLinked = settings.role === 'student' && !!settings.coordinatorId;
                     </div>
                   </div>
 
-                  <div class="form-row">
-                    <div class="form-group">
-                      <label for="startDate">Program Start Date</label>
-                      <input type="date" id="startDate" name="startDate" value={settings.startDate} required />
-                      <p class="form-hint">Hours before this date will be ignored.</p>
-                    </div>
-                  </div>
-                  <div class="form-row split">
-                    <div class="form-group">
-                      <label for="targetHours">Target Hours</label>
-                      <div class="input-wrapper">
-                        <input type="number" id="targetHours" name="targetHours" value={settings.targetHours} step="0.5" required />
-                        <span class="input-suffix">hrs</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button type="submit" class="save-btn">Save Config</button>
+                  <button type="submit" class="save-btn">Update Configuration</button>
                 </form>
 
                 <script is:inline>
@@ -191,6 +141,51 @@ const isLinked = settings.role === 'student' && !!settings.coordinatorId;
                     if (fields) fields.style.display = e.target.checked ? 'block' : 'none';
                   });
                 </script>
+              </section>
+
+              <section class="settings-card">
+                <h2 class="card-title">Coordinator Connection</h2>
+                
+                {settings.coordinatorId ? (
+                  <form action="/api/settings" method="POST" class="settings-form">
+                    <input type="hidden" name="unlink" value="true" />
+                    <input type="hidden" name="redirect" value="/settings" />
+                    
+                    <div class="linked-info">
+                      <div class="link-status">
+                        <div class="status-dot pulse"></div>
+                        <span>Linked to <strong>{coordinatorName}</strong></span>
+                      </div>
+                      <p class="hint">Your coordinator can now view your progress and DTR logs.</p>
+                      
+                      <button type="submit" class="unlink-btn mt-16">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+                        Unlink from Coordinator
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <form action="/api/settings" method="POST" class="settings-form">
+                    <input type="hidden" name="setupComplete" value="true" />
+                    <input type="hidden" name="redirect" value="/settings" />
+                    
+                    <div class="unlinked-info">
+                      <div class="link-status unlinked">
+                        <div class="status-dot gray"></div>
+                        <span>Not linked to a coordinator</span>
+                      </div>
+                    </div>
+
+                    <div class="form-group mt-16">
+                      <label for="coordinatorInvite">Link via Invite Code</label>
+                      <div class="input-with-btn">
+                        <input type="text" id="coordinatorInvite" name="coordinatorInvite" placeholder="Enter 6-digit code" required />
+                        <button type="submit" class="apply-btn">Link</button>
+                      </div>
+                      <p class="form-hint">Paste the code given by your OJT Coordinator to sync your progress.</p>
+                    </div>
+                  </form>
+                )}
               </section>
             </>
           )}
@@ -462,6 +457,8 @@ const isLinked = settings.role === 'student' && !!settings.coordinatorId;
   .input-with-btn { display: flex; gap: 10px; }
   .input-with-btn input { flex: 1; }
   .apply-btn { background: rgba(237, 102, 33, 0.1); border: 1px solid rgba(237, 102, 33, 0.3); color: var(--ntv-orange); padding: 0 16px; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer; }
+  .unlink-btn { display: inline-flex; align-items: center; gap: 8px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; transition: 0.2s; }
+  .unlink-btn:hover { background: #ef4444; color: white; border-color: #ef4444; transform: translateY(-1px); }
 
   @media (max-width: 900px) { 
     #portal-main { margin-left: 0; padding: 24px 16px; } 
