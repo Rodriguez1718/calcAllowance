@@ -333,24 +333,16 @@ const needsUpdate =
 
   @media print {
     @page { 
-      margin: 0.8cm;
-      size: A4 portrait;
+      margin: 0.4cm;
+      size: letter portrait;
     }
     
     /* Hide nav elements */
-    #sys-header, #sidebar, .no-print { display: none !important; }
+    #sys-header, #sidebar, .no-print, .dash-greeting, .sync-status { display: none !important; }
     
     /* Reset layout for print */
-    #portal-body { 
-      display: block !important; 
-      padding: 0 !important; 
-      min-height: auto !important; 
-    }
-    
-    #portal-main { 
-      margin: 0 !important; 
-      padding: 0 !important; 
-    }
+    #portal-body { display: block !important; padding: 0 !important; min-height: auto !important; }
+    #portal-main { margin: 0 !important; padding: 0 !important; }
     
     /* DTR container */
     .dtr-container { 
@@ -360,7 +352,24 @@ const needsUpdate =
       padding: 0 !important;
       margin: 0 !important;
       border-radius: 0 !important;
+      color: black !important;
+      page-break-inside: avoid;
     }
+
+    .dtr-header { margin-bottom: 10px; }
+    .dtr-title { padding: 6px; font-size: 18px; }
+    .info-item { padding: 5px 10px; font-size: 12px; }
+    .label { width: 90px; }
+    
+    .dtr-table th { padding: 4px; font-size: 11px; }
+    .dtr-table td { padding: 4px 6px; font-size: 11px; height: 22px; }
+    
+    .dtr-footer { margin-top: 15px; font-size: 11px; }
+    .certification { margin-bottom: 12px; font-size: 12px; }
+    .approval { margin-top: 15px; margin-bottom: 10px; font-size: 12px; }
+    .sig-lines { gap: 25px; margin-bottom: 15px; }
+    .sig-underline { height: 16px; min-width: 150px; }
+    .sig-label { font-size: 12px; }
   }
 
   @media (max-width: 850px) {

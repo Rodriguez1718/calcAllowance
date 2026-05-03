@@ -60,6 +60,31 @@ export async function addManualEntry(entry: Omit<TimeEntry, 'id' | 'durationSeco
   return data;
 }
 
+export async function updateManualEntry(id: string, entry: Omit<TimeEntry, 'id' | 'durationSeconds' | 'userId'>) {
+  const start = new Date(`${entry.date}T${entry.startTime}`);
+  const end = new Date(`${entry.date}T${entry.endTime}`);
+  
+  if (end < start) throw new Error('End time must be after start time');
+
+  const durationSeconds = (end.getTime() - start.getTime()) / 1000;
+  
+  const { data, error } = await supabase
+    .from('entries')
+    .update({
+      description: entry.description,
+      date: entry.date,
+      start_time: entry.startTime,
+      end_time: entry.endTime,
+      duration_seconds: durationSeconds
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function deleteManualEntry(id: string) {
   const { error } = await supabase
     .from('entries')

@@ -21,81 +21,152 @@ if (!user) {
 const settings = await getAppSettings(user.id);
 const isClockifySet = !!(import.meta.env.CLOCKIFY_API_KEY && import.meta.env.CLOCKIFY_WORKSPACE_ID);
 
+// Shared grouping logic for Earnings Breakdown
+const groupEntries = (entries: any[], schedule: string) => {
+  const map: Record<string, { label: string, seconds: number, days: Set<string>, sortKey: string }> = {};
+  
+  entries.forEach(e => {
+    const d = new Date(e.date);
+    let key = '';
+    let label = '';
+    let sortKey = '';
+    
+    if (schedule === 'weekly') {
+      const firstDayOfYear = new Date(d.getFullYear(), 0, 1);
+      const pastDaysOfYear = (d.getTime() - firstDayOfYear.getTime()) / 86400000;
+      const weekNum = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+      key = `${d.getFullYear()}-W${weekNum}`;
+      label = `Week ${weekNum}, ${d.getFullYear()}`;
+      sortKey = key;
+    } else if (schedule === 'semi-monthly') {
+      const day = d.getDate();
+      let paydayMonth = d.getMonth();
+      let paydayYear = d.getFullYear();
+      let period = '';
+
+      let periodStart = '';
+      let periodEnd = '';
+
+      if (day >= 30) {
+        // 30th and 31st belong to the 15th payday of the NEXT month
+        paydayMonth += 1;
+        period = "15th";
+        const prevMonth = new Date(paydayYear, paydayMonth - 1, 30);
+        const currMonthEnd = new Date(paydayYear, paydayMonth, 14);
+        periodStart = prevMonth.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        periodEnd = currMonthEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      } else if (day >= 15) {
+        // 15th to 29th belong to the 30th payday of the CURRENT month
+        period = "30th";
+        const currMonthStart = new Date(paydayYear, paydayMonth, 15);
+        const currMonthEnd = new Date(paydayYear, paydayMonth, 29);
+        periodStart = currMonthStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        periodEnd = currMonthEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      } else {
+        // 1st to 14th belong to the 15th payday of the CURRENT month
+        period = "15th";
+        const prevMonth = new Date(paydayYear, paydayMonth - 1, 30);
+        const currMonthEnd = new Date(paydayYear, paydayMonth, 14);
+        periodStart = prevMonth.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        periodEnd = currMonthEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }
+
+      // Handle year overflow
+      if (paydayMonth > 11) {
+        paydayMonth = 0;
+        paydayYear += 1;
+      }
+
+      const paydayDate = new Date(paydayYear, paydayMonth, period === "15th" ? 15 : 30);
+      label = `${periodStart} - ${periodEnd} (Payday: ${paydayDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+      sortKey = `${paydayYear}-${String(paydayMonth + 1).padStart(2, '0')}-${period === "15th" ? '1' : '2'}`;
+      key = sortKey;
+    } else {
+      key = e.date.substring(0, 7);
+      label = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+      sortKey = key;
+    }
+    
+    if (!map[key]) map[key] = { label, seconds: 0, days: new Set(), sortKey };
+    map[key].seconds += e.durationSeconds;
+    map[key].days.add(e.date);
+  });
+  
+  return Object.values(map).sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+};
+
 // Fetch data (Clockify or Manual)
 let renderedHours = 0;
 let monthlyData = [];
 let clockifyError = null;
 let isUsingManual = false;
+let allRawEntries = [];
+let activeTimer = null;
 
 if (isClockifySet) {
   try {
+    const { getActiveTimer } = await import('../lib/clockify');
     const clockifyUser = await getClockifyUser(user.email);
     if (clockifyUser) {
-      const data = await getRenderedHours(clockifyUser.id, settings.startDate);
+      // Fetch both completed and active timer
+      const [data, active] = await Promise.all([
+        getRenderedHours(clockifyUser.id, settings.startDate),
+        getActiveTimer(clockifyUser.id)
+      ]);
+      
       renderedHours = data.totalHours;
-      monthlyData = data.monthlyBreakdown;
+      allRawEntries = data.entries;
+      activeTimer = active;
+
+      if (activeTimer) {
+        // Add active timer to total hours
+        const activeHours = activeTimer.elapsedSeconds / 3600;
+        renderedHours += activeHours;
+        
+        // Add to entries for breakdown calculation (today's date in Manila)
+        const isoDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+        allRawEntries.push({ date: isoDate, durationSeconds: activeTimer.elapsedSeconds });
+      }
     } else {
       isUsingManual = true;
     }
   } catch (err) {
     console.error('Clockify sync error:', err);
     clockifyError = err.message;
-    isUsingManual = true; // Fallback on error too
+    isUsingManual = true; 
   }
 } else {
   isUsingManual = true;
 }
 
 if (isUsingManual) {
-  // Manual Fallback
   const manualEntries = await getManualEntries(user.id);
-  const filtered = manualEntries.filter(e => new Date(e.date) >= new Date(settings.startDate));
-  renderedHours = filtered.reduce((acc, e) => acc + e.durationSeconds, 0) / 3600;
+  allRawEntries = manualEntries
+    .filter(e => new Date(e.date) >= new Date(settings.startDate))
+    .map(e => ({ date: e.date, durationSeconds: e.durationSeconds }));
   
-  // Dynamic grouping logic
-  const groupEntries = (entries: any[], schedule: string) => {
-    const map: Record<string, { label: string, seconds: number, days: Set<string> }> = {};
-    
-    entries.forEach(e => {
-      const d = new Date(e.date);
-      let key = '';
-      let label = '';
-      
-      if (schedule === 'weekly') {
-        const firstDayOfYear = new Date(d.getFullYear(), 0, 1);
-        const pastDaysOfYear = (d.getTime() - firstDayOfYear.getTime()) / 86400000;
-        const weekNum = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
-        key = `${d.getFullYear()}-W${weekNum}`;
-        label = `Week ${weekNum}, ${d.getFullYear()}`;
-      } else if (schedule === 'semi-monthly') {
-        const isSecondHalf = d.getDate() > 15;
-        key = `${e.date.substring(0, 7)}-${isSecondHalf ? 'H2' : 'H1'}`;
-        label = `${d.toLocaleString('en-US', { month: 'long' })} ${isSecondHalf ? '16-31' : '1-15'}, ${d.getFullYear()}`;
-      } else {
-        key = e.date.substring(0, 7);
-        label = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-      }
-      
-      if (!map[key]) map[key] = { label, seconds: 0, days: new Set() };
-      map[key].seconds += e.durationSeconds;
-      map[key].days.add(e.date);
-    });
-    
-    return Object.values(map).sort((a, b) => b.label.localeCompare(a.label));
-  };
-
-  const grouped = groupEntries(isUsingManual ? filtered : activity.map(a => ({ date: a.startTime.split(' ')[0], durationSeconds: a.duration })), settings.paySchedule);
-  monthlyData = grouped.map(item => ({
-    label: item.label,
-    hours: item.seconds / 3600,
-    days: item.days.size
-  }));
+  renderedHours = allRawEntries.reduce((acc, e) => acc + e.durationSeconds, 0) / 3600;
 }
+
+// Apply grouping to whatever entries we have
+const grouped = groupEntries(allRawEntries, settings.paySchedule);
+monthlyData = grouped.map(item => ({
+  label: item.label,
+  hours: item.seconds / 3600,
+  days: item.days.size
+}));
 
 // Compute countdown (using static target for now, or could add targetDate to settings)
 const targetDate = new Date('2026-05-12T00:00:00+08:00');
 const now = new Date();
 const daysLeft = Math.max(0, Math.ceil((targetDate.getTime() - now.getTime()) / 86400000));
+
+const formatHMS = (totalSeconds: number) => {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = Math.floor(totalSeconds % 60);
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+};
 
 const formatTo12hr = (timeStr: string) => {
   if (!timeStr) return '';
@@ -217,9 +288,34 @@ if (!isUsingManual) {
 
       <div id="dash-content" class="content-center">
         <div class="dash-greeting">
-          <h1>Welcome back, <span class="accent">{user.name?.split(' ')[0]}</span></h1>
-          <p>Here's your progress overview for the current internship cycle.</p>
+          <div class="greeting-left">
+            <h1>Welcome back, <span class="accent">{user.name?.split(' ')[0]}</span></h1>
+            <p>Here's your progress overview for the current internship cycle.</p>
+          </div>
+          <div class="sync-status">
+            <span class="sync-dot"></span>
+            Real-time Sync Active
+          </div>
         </div>
+
+        {activeTimer && (
+          <div class="active-timer-banner">
+            <div class="timer-info">
+              <span class="pulse-ring"></span>
+              <div class="timer-details">
+                <span class="timer-label">CURRENTLY LOGGING</span>
+                <span class="timer-desc">{activeTimer.description}</span>
+              </div>
+            </div>
+            <div class="timer-stats">
+              <div class="timer-stat">
+                <span class="stat-label">Elapsed</span>
+                <span class="stat-val">{(activeTimer.elapsedSeconds / 3600).toFixed(2)}h</span>
+              </div>
+              <a href="/tracker" class="timer-link">View Tracker</a>
+            </div>
+          </div>
+        )}
 
         <div class="progress-section">
           <div class="progress-header">
@@ -238,8 +334,8 @@ if (!isUsingManual) {
             <div class="metric-sub">Current multiplier · updated weekly</div>
           </div>
           <div class="metric-card highlight">
-            <div class="metric-label">Hours Remaining</div>
-            <div class="metric-value">{Math.max(0, settings.targetHours - renderedHours).toFixed(1)}<span class="metric-unit"> hrs</span></div>
+            <div class="metric-label">Time Remaining</div>
+            <div class="metric-value">{formatHMS(Math.max(0, (settings.targetHours * 3600) - (renderedHours * 3600)))}</div>
             <div class="metric-sub">
               {(() => {
                 const remaining = Math.max(0, settings.targetHours - renderedHours);
@@ -253,8 +349,8 @@ if (!isUsingManual) {
           </div>
           <div class="metric-card">
             <div class="metric-label">Your Progress</div>
-            <div class="metric-value">{renderedHours.toFixed(1)}<span class="metric-unit"> / {settings.targetHours} hrs</span></div>
-            <div class="metric-sub">{clockifyError ? <span class="error-text">{clockifyError}</span> : `Logged since ${new Date(settings.startDate).toLocaleDateString()}`}</div>
+            <div class="metric-value">{formatHMS(renderedHours * 3600)}</div>
+            <div class="metric-sub">{clockifyError ? <span class="error-text">{clockifyError}</span> : `Target: ${settings.targetHours} hrs`}</div>
           </div>
         </div>
 
@@ -337,10 +433,42 @@ if (!isUsingManual) {
   .bg-glow { position: fixed; top: 20%; left: 55%; transform: translateX(-50%); width: 560px; height: 360px; background: radial-gradient(ellipse, rgba(237, 102, 33, 0.08) 0%, transparent 70%); pointer-events: none; z-index: 0; }
   #dash-content { position: relative; z-index: 1; max-width: 900px; animation: cin .5s cubic-bezier(.16,1,.3,1) both; }
   @keyframes cin { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
-  .dash-greeting { margin-bottom: 32px; }
+  .dash-greeting { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
   .dash-greeting h1 { font-size: 28px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
   .dash-greeting p { font-size: 14px; color: var(--text-secondary); }
+  .sync-status { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; color: #34d399; background: rgba(52, 211, 153, 0.08); padding: 6px 12px; border-radius: 20px; border: 1px solid rgba(52, 211, 153, 0.2); }
+  .sync-dot { width: 6px; height: 6px; background: #34d399; border-radius: 50%; box-shadow: 0 0 8px #34d399; }
   .accent { background: var(--ntv-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+  .active-timer-banner { 
+    display: flex; justify-content: space-between; align-items: center; 
+    background: rgba(237, 102, 33, 0.1); border: 1px solid rgba(237, 102, 33, 0.3);
+    border-radius: 16px; padding: 16px 24px; margin-bottom: 24px;
+    animation: slideDown .4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+  
+  .timer-info { display: flex; align-items: center; gap: 16px; }
+  .pulse-ring { 
+    width: 10px; height: 10px; background: var(--ntv-orange); border-radius: 50%; 
+    position: relative; box-shadow: 0 0 10px var(--ntv-orange);
+  }
+  .pulse-ring::after { 
+    content: ''; position: absolute; inset: -4px; border-radius: 50%; 
+    border: 2px solid var(--ntv-orange); animation: ringPulse 1.5s ease-out infinite; 
+  }
+  @keyframes ringPulse { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(2.5); opacity: 0; } }
+  
+  .timer-details { display: flex; flex-direction: column; }
+  .timer-label { font-size: 10px; font-weight: 700; color: var(--ntv-orange); letter-spacing: 0.1em; }
+  .timer-desc { font-size: 14px; font-weight: 500; color: #fff; }
+  
+  .timer-stats { display: flex; align-items: center; gap: 24px; }
+  .timer-stat { display: flex; flex-direction: column; align-items: flex-end; }
+  .stat-label { font-size: 10px; color: var(--text-secondary); }
+  .stat-val { font-size: 16px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+  .timer-link { font-size: 12px; font-weight: 700; color: #fff; text-decoration: none; background: rgba(255, 255, 255, 0.1); padding: 8px 16px; border-radius: 8px; transition: all 0.2s; }
+  .timer-link:hover { background: rgba(255, 255, 255, 0.15); transform: translateX(2px); }
   
   .progress-section { margin-bottom: 32px; background: var(--card-bg); padding: 20px 24px; border-radius: 14px; border: 1px solid var(--border-subtle); }
   .progress-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; }

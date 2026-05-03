@@ -25,6 +25,32 @@ export async function getClockifyUser(email: string) {
   return user;
 }
 
+export async function getActiveTimer(clockifyUserId: string) {
+  const apiKey = import.meta.env.CLOCKIFY_API_KEY;
+  const workspaceId = import.meta.env.CLOCKIFY_WORKSPACE_ID;
+
+  const response = await fetch(
+    `${CLOCKIFY_API_URL}/workspaces/${workspaceId}/user/${clockifyUserId}/time-entries?in-progress=true`,
+    { headers: { 'X-Api-Key': apiKey } }
+  );
+
+  if (!response.ok) return null;
+  const entries = await response.json();
+  const active = entries[0]; // Clockify returns an array, usually just one active
+
+  if (active && active.timeInterval && active.timeInterval.start) {
+    const start = new Date(active.timeInterval.start);
+    const now = new Date();
+    const elapsedSeconds = Math.floor((now.getTime() - start.getTime()) / 1000);
+    return {
+      description: active.description || 'Active Session',
+      start: active.timeInterval.start,
+      elapsedSeconds
+    };
+  }
+  return null;
+}
+
 export async function getRenderedHours(clockifyUserId: string, startDate?: string) {
   const apiKey = import.meta.env.CLOCKIFY_API_KEY;
   const workspaceId = import.meta.env.CLOCKIFY_WORKSPACE_ID;
@@ -38,6 +64,8 @@ export async function getRenderedHours(clockifyUserId: string, startDate?: strin
   const pageSize = 50;
   let hasMore = true;
   const monthlyBreakdown: Record<string, number> = {};
+
+  const allEntries: { date: string, durationSeconds: number }[] = [];
 
   while (hasMore) {
     const start = startDate ? new Date(startDate).toISOString() : '2024-01-01T00:00:00Z';
@@ -64,12 +92,11 @@ export async function getRenderedHours(clockifyUserId: string, startDate?: strin
           const seconds = parseIsoDuration(entry.timeInterval.duration);
           totalSeconds += seconds;
 
-          // Monthly grouping in Manila time
-          const entryDate = new Date(entry.timeInterval.start);
-          const year = new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: 'Asia/Manila' }).format(entryDate);
-          const month = new Intl.DateTimeFormat('en-US', { month: '2-digit', timeZone: 'Asia/Manila' }).format(entryDate);
-          const monthKey = `${year}-${month}`;
-          monthlyBreakdown[monthKey] = (monthlyBreakdown[monthKey] || 0) + seconds;
+          const date = new Date(entry.timeInterval.start);
+          // Use en-CA for a reliable YYYY-MM-DD format
+          const isoDate = date.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+
+          allEntries.push({ date: isoDate, durationSeconds: seconds });
         }
       }
       
@@ -82,10 +109,7 @@ export async function getRenderedHours(clockifyUserId: string, startDate?: strin
 
   return {
     totalHours: totalSeconds / 3600,
-    monthlyBreakdown: Object.entries(monthlyBreakdown).map(([month, seconds]) => ({
-      month,
-      hours: seconds / 3600,
-    })).sort((a, b) => b.month.localeCompare(a.month))
+    entries: allEntries
   };
 }
 
