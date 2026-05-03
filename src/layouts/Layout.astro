@@ -85,12 +85,33 @@ import Toaster from "../components/Toaster.astro";
   }
 
   /* Utilities */
+  .content-center {
+    max-width: 1000px;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+  }
+
   .mobile-only {
     display: none;
   }
+
   @media (max-width: 900px) {
     .mobile-only {
       display: flex;
+    }
+    
+    /* Ensure all main content areas are centered on mobile */
+    [id="portal-main"] {
+      padding: 24px 16px !important;
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+    }
+    
+    [id$="-content"], .content-grid, .tracker-layout, .dtr-scroll-wrapper {
+      width: 100% !important;
+      max-width: 100% !important;
     }
   }
 </style>

@@ -116,7 +116,7 @@ export async function getDailyDTR(clockifyUserId: string, year: number, month: n
     const day = startDate.getDate();
     const duration = parseIsoDuration(entry.timeInterval.duration);
     
-    const timeStr = (date: Date) => date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    const timeStr = (date: Date) => date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Manila' });
 
     dtr[day].totalSeconds += duration;
 
@@ -159,7 +159,7 @@ export async function getRecentEntries(clockifyUserId: string) {
   
   return entries.map((e: any) => ({
     description: e.description || 'Working on tasks',
-    startTime: new Date(e.timeInterval.start).toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+    startTime: new Date(e.timeInterval.start).toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Manila' }),
     duration: parseIsoDuration(e.timeInterval.duration)
   }));
 }
