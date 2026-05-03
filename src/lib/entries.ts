@@ -4,10 +4,12 @@ export interface TimeEntry {
   id: string;
   userId: string;
   description: string;
-  date: string; // YYYY-MM-DD
+  date: string; // YYYY-MM-DD (derived)
   startTime: string; // HH:mm
   endTime: string; // HH:mm
   durationSeconds: number;
+  startFull: string; // ISO String
+  endFull: string; // ISO String
 }
 
 export async function getManualEntries(userId: string): Promise<TimeEntry[]> {
@@ -16,28 +18,43 @@ export async function getManualEntries(userId: string): Promise<TimeEntry[]> {
       .from('entries')
       .select('*')
       .eq('user_id', userId)
-      .order('date', { ascending: false });
+      .order('start_time', { ascending: false });
 
     if (error) throw error;
     
-    return (data || []).map(e => ({
-      id: e.id,
-      userId: e.user_id,
-      description: e.description,
-      date: e.date,
-      startTime: e.start_time.substring(0, 5),
-      endTime: e.end_time.substring(0, 5),
-      durationSeconds: e.duration_seconds
-    }));
+    return (data || []).map(e => {
+      const start = new Date(e.start_time);
+      const end = new Date(e.end_time);
+      
+      const timeStr = (d: Date) => d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit' });
+      const dateStr = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+
+      return {
+        id: e.id,
+        userId: e.user_id,
+        description: e.description,
+        date: dateStr(start),
+        startTime: timeStr(start),
+        endTime: timeStr(end),
+        durationSeconds: e.duration_seconds,
+        startFull: e.start_time,
+        endFull: e.end_time
+      };
+    });
   } catch (e) {
     console.error('Error fetching entries:', e);
     return [];
   }
 }
 
-export async function addManualEntry(entry: Omit<TimeEntry, 'id' | 'durationSeconds'>) {
-  const start = new Date(`${entry.date}T${entry.startTime}`);
-  const end = new Date(`${entry.date}T${entry.endTime}`);
+export async function addManualEntry(entry: { userId: string, description: string, date: string, startTime: string, endTime: string }) {
+  // Combine date and time to create full timestamps in Philippine Time
+  const startStr = `${entry.date}T${entry.startTime}:00`;
+  const endStr = `${entry.date}T${entry.endTime}:00`;
+  
+  // We handle these as local times for the user (Asia/Manila)
+  const start = new Date(startStr);
+  const end = new Date(endStr);
   
   if (end < start) throw new Error('End time must be after start time');
 
@@ -48,9 +65,8 @@ export async function addManualEntry(entry: Omit<TimeEntry, 'id' | 'durationSeco
     .insert({
       user_id: entry.userId,
       description: entry.description,
-      date: entry.date,
-      start_time: entry.startTime,
-      end_time: entry.endTime,
+      start_time: start.toISOString(),
+      end_time: end.toISOString(),
       duration_seconds: durationSeconds
     })
     .select()
@@ -60,9 +76,12 @@ export async function addManualEntry(entry: Omit<TimeEntry, 'id' | 'durationSeco
   return data;
 }
 
-export async function updateManualEntry(id: string, entry: Omit<TimeEntry, 'id' | 'durationSeconds' | 'userId'>) {
-  const start = new Date(`${entry.date}T${entry.startTime}`);
-  const end = new Date(`${entry.date}T${entry.endTime}`);
+export async function updateManualEntry(id: string, entry: { description: string, date: string, startTime: string, endTime: string }) {
+  const startStr = `${entry.date}T${entry.startTime}:00`;
+  const endStr = `${entry.date}T${entry.endTime}:00`;
+  
+  const start = new Date(startStr);
+  const end = new Date(endStr);
   
   if (end < start) throw new Error('End time must be after start time');
 
@@ -72,9 +91,8 @@ export async function updateManualEntry(id: string, entry: Omit<TimeEntry, 'id' 
     .from('entries')
     .update({
       description: entry.description,
-      date: entry.date,
-      start_time: entry.startTime,
-      end_time: entry.endTime,
+      start_time: start.toISOString(),
+      end_time: end.toISOString(),
       duration_seconds: durationSeconds
     })
     .eq('id', id)
@@ -136,22 +154,6 @@ export async function startTimer(userId: string, description: string = '') {
   return data;
 }
 
-export async function updateTimerStart(userId: string, newStartTime: string) {
-  const [h, m] = newStartTime.split(':').map(Number);
-  const date = new Date();
-  date.setHours(h, m, 0, 0);
-
-  const { data, error } = await supabase
-    .from('active_timers')
-    .update({ start_time: date.toISOString() })
-    .eq('user_id', userId)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
 export async function stopTimer(userId: string, description: string) {
   const timer = await getActiveTimer(userId);
   if (!timer) throw new Error('No active timer found');
@@ -159,25 +161,19 @@ export async function stopTimer(userId: string, description: string) {
 
   const now = new Date();
   const start = new Date(timer.startTime);
+  const durationSeconds = Math.floor((now.getTime() - start.getTime()) / 1000);
   
-  // Force Philippine Time (Asia/Manila)
-  const getPHT = (date: Date) => {
-    return {
-      date: date.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }), // YYYY-MM-DD
-      time: date.toLocaleTimeString('en-GB', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit' }) // HH:mm
-    };
-  };
+  const { error: logError } = await supabase
+    .from('entries')
+    .insert({
+      user_id: userId,
+      description,
+      start_time: start.toISOString(),
+      end_time: now.toISOString(),
+      duration_seconds: Math.max(0, durationSeconds)
+    });
 
-  const startPHT = getPHT(start);
-  const nowPHT = getPHT(now);
-  
-  await addManualEntry({
-    userId,
-    description,
-    date: startPHT.date,
-    startTime: startPHT.time,
-    endTime: nowPHT.time
-  });
+  if (logError) throw logError;
 
   const { error } = await supabase
     .from('active_timers')

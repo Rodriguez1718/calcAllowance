@@ -1,0 +1,276 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Header from '../components/Header.astro';
+import Sidebar from '../components/Sidebar.astro';
+import { getSession } from '../lib/auth';
+import { parse } from 'cookie';
+import { getAppSettings } from '../lib/settings';
+import { supabase } from '../lib/supabase';
+
+const cookieHeader = Astro.request.headers.get('cookie') || '';
+const cookies = parse(cookieHeader);
+const user = cookies.session ? await getSession(cookies.session) : null;
+
+if (!user) return Astro.redirect('/');
+
+const settings = await getAppSettings(user.id);
+if (settings.role !== 'coordinator') return Astro.redirect('/dashboard');
+
+import { getStudentProgress } from '../lib/clockify';
+
+// Fetch Students
+const { data: students } = await supabase
+  .from('student_settings')
+  .select('*')
+  .eq('coordinator_id', user.id);
+
+// Fetch Total Rendered Hours (Syncing Clockify on top of cached manual hours)
+const studentStats = await Promise.all((students || []).map(async (s) => {
+  // getStudentProgress now uses the cached DB value internally for speed
+  const hours = await getStudentProgress(s.user_id, s.user_email, s.start_date);
+  const percent = Math.min(100, (hours / s.target_hours) * 100);
+  
+  return {
+    ...s,
+    renderedHours: hours,
+    percent: percent.toFixed(1)
+  };
+}));
+
+const selectedAgency = Astro.url.searchParams.get('agency') || 'all';
+const selectedStatus = Astro.url.searchParams.get('status') || 'all';
+
+// Unique agencies for the filter dropdown
+const agencies = [...new Set(studentStats.map(s => s.host_company).filter(Boolean))].sort();
+
+// Filtered list
+let filteredStudents = studentStats;
+
+if (selectedAgency !== 'all') {
+  filteredStudents = filteredStudents.filter(s => s.host_company === selectedAgency);
+}
+
+if (selectedStatus === 'completed') {
+  filteredStudents = filteredStudents.filter(s => Number(s.percent) >= 100);
+} else if (selectedStatus === 'ongoing') {
+  filteredStudents = filteredStudents.filter(s => Number(s.percent) < 100);
+}
+
+const completedCount = studentStats.filter(s => Number(s.percent) >= 100).length;
+const inProgressCount = studentStats.length - completedCount;
+const totalTargetHours = studentStats.reduce((acc, s) => acc + s.target_hours, 0);
+const totalRenderedHours = studentStats.reduce((acc, s) => acc + s.renderedHours, 0);
+---
+
+<Layout>
+  <Header user={user} />
+  <div id="portal-body">
+    <Sidebar user={user} activeTab="dashboard" role={settings.role} />
+    <main id="portal-main">
+      <div class="bg-grid" aria-hidden="true"></div>
+      
+      <div id="coord-content" class="content-center">
+        <div class="page-header">
+          <div class="header-main">
+            <h1>Coordinator <span class="accent">Dashboard</span></h1>
+            <p>Monitoring progress for students under your supervision.</p>
+          </div>
+          <div class="invite-panel">
+            <span class="invite-label">YOUR INVITE CODE</span>
+            <div class="invite-code-box">
+              <span class="code">{settings.inviteCode}</span>
+              <button class="copy-btn" onclick={`navigator.clipboard.writeText('${settings.inviteCode}'); window.showToast('Code copied!')`}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats-overview">
+          <div class="stat-card">
+            <div class="stat-label">Total Students</div>
+            <div class="stat-value">{studentStats.length}</div>
+          </div>
+          <div class="stat-card completed">
+            <div class="stat-label">Completed</div>
+            <div class="stat-value">{completedCount}</div>
+          </div>
+          <div class="stat-card active">
+            <div class="stat-label">In Progress</div>
+            <div class="stat-value">{inProgressCount}</div>
+          </div>
+        </div>
+
+        <div class="student-section">
+          <div class="section-header-row">
+            <h2 class="section-title">Student Roster</h2>
+            
+            <div class="filter-group-row">
+              <div class="filter-box">
+                <label for="agency-filter">Agency:</label>
+                <select id="agency-filter" class="filter-select" onchange="const params = new URLSearchParams(window.location.search); params.set('agency', this.value); window.location.search = params.toString();">
+                  <option value="all" selected={selectedAgency === 'all'}>All Agencies</option>
+                  {agencies.map(agency => (
+                    <option value={agency} selected={selectedAgency === agency}>{agency}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div class="filter-box">
+                <label for="status-filter">Status:</label>
+                <select id="status-filter" class="filter-select" onchange="const params = new URLSearchParams(window.location.search); params.set('status', this.value); window.location.search = params.toString();">
+                  <option value="all" selected={selectedStatus === 'all'}>All Status</option>
+                  <option value="completed" selected={selectedStatus === 'completed'}>Completed</option>
+                  <option value="ongoing" selected={selectedStatus === 'ongoing'}>In Progress</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          
+          <div class="table-wrapper">
+            <table class="student-table">
+              <thead>
+                <tr>
+                  <th>Student Name</th>
+                  <th>Agency</th>
+                  <th>Hours Rendered</th>
+                  <th>Progress</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStudents.length > 0 ? filteredStudents.map((s) => (
+                  <tr>
+                    <td>
+                      <div class="student-info-cell">
+                        {s.user_picture && <img src={s.user_picture} alt="" class="row-avatar" />}
+                        <span class="row-name">{s.user_name}</span>
+                      </div>
+                    </td>
+                    <td><span class="program-tag">{s.host_company}</span></td>
+                    <td class="mono">{s.renderedHours.toFixed(2)} / {s.target_hours}h</td>
+                    <td>
+                      <div class="progress-col">
+                        <span class="percent">{s.percent}%</span>
+                        <div class="mini-track">
+                          <div class="mini-fill" style={`width: ${s.percent}%`}></div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <span class={`status-badge ${Number(s.percent) >= 100 ? 'done' : 'active'}`}>
+                        {Number(s.percent) >= 100 ? 'Completed' : 'In Progress'}
+                      </span>
+                    </td>
+                    <td>
+                      <a href={`/dtr?studentId=${s.user_id}`} class="view-link">View DTR</a>
+                    </td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colspan="5" class="empty-state">No students have joined your roster yet. Share your code to get started!</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<style>
+  #portal-body { display: flex; min-height: 100vh; padding-top: 56px; }
+  #portal-main { margin-left: 220px; flex: 1; padding: 40px; position: relative; }
+  .bg-grid { position: fixed; inset: 0; background-image: linear-gradient(rgba(237, 102, 33, .04) 1px, transparent 1px), linear-gradient(90deg, rgba(237, 102, 33, .04) 1px, transparent 1px); background-size: 40px 40px; pointer-events: none; }
+  
+  #coord-content { position: relative; z-index: 1; max-width: 1100px; animation: cin .5s cubic-bezier(.16,1,.3,1) both; }
+  @keyframes cin { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+
+  .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; }
+  .header-main h1 { font-size: 28px; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
+  .accent { background: var(--ntv-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header-main p { color: var(--text-secondary); font-size: 14px; margin-top: 4px; }
+
+  .invite-panel { background: rgba(13, 20, 33, 0.6); border: 1px solid rgba(237, 102, 33, 0.2); padding: 12px 20px; border-radius: 12px; text-align: right; }
+  .invite-label { display: block; font-size: 9px; font-weight: 800; color: var(--ntv-orange); letter-spacing: 0.1em; margin-bottom: 6px; }
+  .invite-code-box { display: flex; align-items: center; gap: 12px; justify-content: flex-end; }
+  .code { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; color: #fff; }
+  .copy-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px; border-radius: 4px; transition: 0.2s; }
+  .copy-btn:hover { color: #fff; background: rgba(255,255,255,0.05); }
+
+  .stats-overview { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+  .stat-card { background: var(--card-bg); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 20px 24px; transition: transform 0.2s; }
+  .stat-card:hover { transform: translateY(-2px); }
+  .stat-card.highlight { border-color: rgba(237, 102, 33, 0.4); background: rgba(237, 102, 33, 0.04); }
+  .stat-card.completed { border-color: rgba(52, 211, 153, 0.4); background: rgba(52, 211, 153, 0.04); }
+  .stat-card.completed .stat-label { color: #34d399; }
+  .stat-card.active { border-color: rgba(96, 165, 250, 0.4); background: rgba(96, 165, 250, 0.04); }
+  .stat-card.active .stat-label { color: #60a5fa; }
+  .stat-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .stat-value { font-size: 28px; font-weight: 700; color: #fff; }
+  .unit { font-size: 14px; color: var(--text-secondary); font-weight: 500; }
+
+  .student-section { margin-top: 40px; }
+  .section-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 20px; }
+  .section-title { font-size: 15px; font-weight: 600; color: var(--ntv-orange); margin: 0; }
+  
+  .filter-group-row { display: flex; align-items: center; gap: 20px; }
+  .filter-box { display: flex; align-items: center; gap: 10px; }
+  .filter-box label { font-size: 10px; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.08em; }
+  .filter-select { background: #1a2333; border: 1.5px solid rgba(255,255,255,0.1); border-radius: 10px; color: #fff; padding: 8px 14px; font-size: 13px; font-weight: 600; outline: none; cursor: pointer; transition: 0.2s; min-width: 140px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+  .filter-select:hover { border-color: var(--ntv-orange); background: #212b3d; }
+  .filter-select:focus { border-color: var(--ntv-orange); box-shadow: 0 0 0 3px rgba(237, 102, 33, 0.2); }
+
+  @media (max-width: 600px) {
+    .section-header-row { flex-direction: column; align-items: flex-start; }
+    .filter-group-row { flex-direction: column; width: 100%; align-items: stretch; }
+    .filter-select { width: 100%; }
+  }
+
+  .student-info-cell { display: flex; align-items: center; gap: 12px; }
+  .row-avatar { width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--ntv-orange); }
+  .row-name { font-weight: 600; color: #fff; }
+  
+  .table-wrapper { background: var(--card-bg); border: 1px solid var(--border-subtle); border-radius: 16px; overflow: hidden; }
+  .student-table { width: 100%; border-collapse: collapse; text-align: left; }
+  .student-table th { padding: 14px 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); border-bottom: 1px solid var(--border-subtle); }
+  .student-table td { padding: 16px 20px; border-bottom: 1px solid var(--border-subtle); font-size: 14px; }
+  .student-table tr:last-child td { border-bottom: none; }
+  .student-table tr:hover { background: rgba(237, 102, 33, 0.02); }
+
+  .student-profile { display: flex; align-items: center; gap: 12px; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border-subtle); }
+  .profile-info { display: flex; flex-direction: column; }
+  .name { font-weight: 600; color: #fff; }
+  .email { font-size: 11px; color: var(--text-secondary); }
+
+  .program-tag { font-size: 12px; color: var(--text-primary); }
+  .mono { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #fff; }
+  
+  .progress-col { display: flex; flex-direction: column; gap: 6px; min-width: 140px; }
+  .percent { font-size: 12px; font-weight: 700; color: var(--ntv-orange); font-family: 'JetBrains Mono', monospace; }
+  .mini-track { width: 100%; height: 4px; background: rgba(255,255,255,0.05); border-radius: 2px; }
+  .mini-fill { height: 100%; background: var(--ntv-gradient); border-radius: 2px; }
+
+  .status-badge { font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 20px; }
+  .status-badge.active { background: rgba(52, 211, 153, 0.1); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.2); }
+  .status-badge.done { background: var(--ntv-gradient); color: #fff; }
+
+  .view-link { font-size: 11px; font-weight: 700; color: var(--ntv-orange); text-decoration: none; padding: 6px 12px; background: rgba(237, 102, 33, 0.1); border: 1px solid rgba(237, 102, 33, 0.2); border-radius: 6px; transition: 0.2s; }
+  .view-link:hover { background: var(--ntv-orange); color: #fff; }
+
+  .empty-state { text-align: center; padding: 60px; color: var(--text-secondary); font-style: italic; }
+
+  @media (max-width: 900px) {
+    #portal-main { margin-left: 0; padding: 20px; width: 100%; overflow-x: hidden; }
+    #coord-content { width: 100%; }
+    .page-header { flex-direction: column; gap: 20px; }
+    .invite-panel { width: 100%; text-align: left; }
+    .invite-code-box { justify-content: flex-start; }
+    .table-wrapper { overflow-x: auto; }
+    .student-table { min-width: 700px; }
+  }
+</style>

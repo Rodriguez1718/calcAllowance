@@ -1,142 +1,185 @@
 ---
-import Layout from '../layouts/Layout.astro';
-import Header from '../components/Header.astro';
-import Sidebar from '../components/Sidebar.astro';
-import { getSession } from '../lib/auth';
-import { parse } from 'cookie';
-import { getClockifyUser, getDailyDTR } from '../lib/clockify';
-import { getAppSettings } from '../lib/settings';
-import { getManualEntries } from '../lib/entries';
+import Layout from "../layouts/Layout.astro";
+import Header from "../components/Header.astro";
+import Sidebar from "../components/Sidebar.astro";
+import { getSession } from "../lib/auth";
+import { parse } from "cookie";
+import { getClockifyUser, getDailyDTR } from "../lib/clockify";
+import { getAppSettings } from "../lib/settings";
+import { getManualEntries } from "../lib/entries";
+import { supabase } from "../lib/supabase";
+import { getStudentProgress } from "../lib/clockify";
 
-const cookieHeader = Astro.request.headers.get('cookie') || '';
+const cookieHeader = Astro.request.headers.get("cookie") || "";
 const cookies = parse(cookieHeader);
 const user = cookies.session ? await getSession(cookies.session) : null;
 
-if (!user) {
-  return Astro.redirect('/');
+if (!user) return Astro.redirect("/");
+
+const mySettings = await getAppSettings(user.id);
+const targetStudentId = Astro.url.searchParams.get("studentId");
+let viewUserId = user.id;
+
+// Coordinator Logic
+let students = [];
+if (mySettings.role === "coordinator") {
+  const { data: myStudents } = await supabase
+    .from("student_settings")
+    .select("user_id, user_name")
+    .eq("coordinator_id", user.id);
+  students = myStudents || [];
+
+  if (targetStudentId && students.some((s) => s.user_id === targetStudentId)) {
+    viewUserId = targetStudentId;
+  } else if (students.length > 0) {
+    viewUserId = students[0].user_id;
+  }
 }
 
-const settings = await getAppSettings(user.id);
+const settings = await getAppSettings(viewUserId);
 const now = new Date();
 const currentMonth = now.getMonth() + 1;
 const currentYear = now.getFullYear();
 
-// Get month from query or default to current
-const month = parseInt(Astro.url.searchParams.get('month') || currentMonth.toString());
-const year = parseInt(Astro.url.searchParams.get('year') || currentYear.toString());
+const month = parseInt(
+  Astro.url.searchParams.get("month") || currentMonth.toString(),
+);
+const year = parseInt(
+  Astro.url.searchParams.get("year") || currentYear.toString(),
+);
 
-const isClockifySet = !!(import.meta.env.CLOCKIFY_API_KEY && import.meta.env.CLOCKIFY_WORKSPACE_ID);
+const isClockifySet = !!(
+  import.meta.env.CLOCKIFY_API_KEY && import.meta.env.CLOCKIFY_WORKSPACE_ID
+);
 
 let dtrData: any = {};
 let totalMonthSeconds = 0;
-let clockifyError = null;
-let isUsingManual = false;
 
-const formatTo12hr = (timeStr: string) => {
-  if (!timeStr) return '';
-  const [h, m] = timeStr.split(':').map(Number);
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const hour = h % 12 || 12;
-  return `${hour}:${String(m).padStart(2, '0')} ${ampm}`;
-};
+// Unified Logic: Combined Manual + Clockify
+const manual = await getManualEntries(viewUserId);
+const manualFiltered = manual.filter((e) => {
+  const d = new Date(e.startFull || `${e.date}T${e.startTime}`);
+  return d.getMonth() + 1 === month && d.getFullYear() === year;
+});
 
+let clockifyId = "";
 if (isClockifySet) {
   try {
-    const clockifyUser = await getClockifyUser(user.email);
-    if (clockifyUser) {
-      dtrData = await getDailyDTR(clockifyUser.id, year, month);
-      totalMonthSeconds = Object.values(dtrData).reduce((acc: number, day: any) => acc + day.totalSeconds, 0);
-    } else {
-      isUsingManual = true;
-    }
-  } catch (err) {
-    clockifyError = (err as Error).message;
-    isUsingManual = true;
-  }
-} else {
-  isUsingManual = true;
+    const clockifyUser = await getClockifyUser(settings.userEmail || "");
+    if (clockifyUser) clockifyId = clockifyUser.id;
+  } catch (e) {}
 }
 
-if (isUsingManual) {
-  // Manual DTR Fallback
-  const manualEntries = await getManualEntries(user.id);
-  const daysInMonth = new Date(year, month, 0).getDate();
-  
-  // Initialize empty DTR for the whole month
-  for (let i = 1; i <= daysInMonth; i++) {
-    dtrData[i] = { amIn: '', amOut: '', pmIn: '', pmOut: '', totalSeconds: 0 };
-  }
+const result = await getDailyDTR(clockifyId, month, year, manualFiltered);
+dtrData = result.days.reduce((acc, d) => {
+  acc[d.day] = d;
+  return acc;
+}, {} as any);
+totalMonthSeconds = result.totalMonthlyHours * 3600;
 
-  const filtered = manualEntries.filter(e => {
-    const d = new Date(e.date);
-    return d.getMonth() + 1 === month && d.getFullYear() === year;
-  });
-
-  filtered.forEach(e => {
-    const day = new Date(e.date).getDate();
-    const [h, m] = e.startTime.split(':').map(Number);
-    const isAM = h < 12 || (h === 12 && m < 30);
-    
-    if (isAM) {
-      if (!dtrData[day].amIn || e.startTime < dtrData[day].amIn) dtrData[day].amIn = formatTo12hr(e.startTime);
-      if (!dtrData[day].amOut || e.endTime > dtrData[day].amOut) dtrData[day].amOut = formatTo12hr(e.endTime);
-    } else {
-      if (!dtrData[day].pmIn || e.startTime < dtrData[day].pmIn) dtrData[day].pmIn = formatTo12hr(e.startTime);
-      if (!dtrData[day].pmOut || e.endTime > dtrData[day].pmOut) dtrData[day].pmOut = formatTo12hr(e.endTime);
-    }
-    dtrData[day].totalSeconds += e.durationSeconds;
-  });
-
-  totalMonthSeconds = Object.values(dtrData).reduce((acc: number, day: any) => acc + day.totalSeconds, 0);
-}
+// Calculate overall progress for the percentage display
+const overallRenderedHours = await getStudentProgress(viewUserId, settings.userEmail || "", settings.startDate);
+const progressPercent = Math.min(100, (overallRenderedHours / (settings.targetHours || 1)) * 100).toFixed(1);
 
 const formatDuration = (seconds: number) => {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
-  return `${h}:${m.toString().padStart(2, '0')}`;
+  return `${h}:${m.toString().padStart(2, "0")}`;
 };
 
-const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long', timeZone: 'Asia/Manila' }).toUpperCase();
+const monthName = new Date(year, month - 1)
+  .toLocaleDateString("en-US", { month: "long", timeZone: "Asia/Manila" })
+  .toUpperCase();
 
-const needsUpdate = 
-  settings.program.includes('Enter') || 
-  settings.hostCompany.includes('Enter') || 
-  settings.supervisor.includes('Enter');
+const needsUpdate =
+  (settings.program?.includes("Enter") ?? true) ||
+  (settings.hostCompany?.includes("Enter") ?? true) ||
+  (settings.supervisor?.includes("Enter") ?? true);
 ---
-<Layout>
+
+<Layout title="DTR Sheet">
   <Header user={user} />
 
   <div id="portal-body">
-    <Sidebar user={user} activeTab="dtr" />
+    <Sidebar user={user} activeTab="dtr" role={mySettings.role} />
 
     <main id="portal-main">
-      {needsUpdate && (
-        <div class="no-print settings-alert">
-          <div class="alert-content">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01"/></svg>
-            <span>Your DTR details are not updated yet. Please update them in the settings.</span>
+      <div class="bg-grid" aria-hidden="true"></div>
+
+      {
+        needsUpdate && (
+          <div class="no-print settings-alert">
+            <div class="alert-content">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" />
+              </svg>
+              <span>
+                Your DTR details are incomplete. Please update them in the
+                settings.
+              </span>
+            </div>
+            <a href="/settings" class="alert-link">
+              Go to Settings
+            </a>
           </div>
-          <a href="/settings" class="alert-link">Go to Settings</a>
-        </div>
-      )}
+        )
+      }
 
       <div class="no-print actions-bar">
         <div class="month-selector">
-          <form method="GET" class="selector-form">
-            <select name="month" onchange="this.form.submit()">
-              {Array.from({length: 12}).map((_, i) => (
-                <option value={i+1} selected={month === i+1}>{new Date(0, i).toLocaleString('en-US', {month: 'long'})}</option>
-              ))}
-            </select>
-            <select name="year" onchange="this.form.submit()">
-              {[2024, 2025, 2026].map(y => (
-                <option value={y} selected={year === y}>{y}</option>
-              ))}
-            </select>
-          </form>
+          {
+            mySettings.role === "coordinator" && students.length > 0 && (
+              <select
+                id="student-selector"
+                class="dtr-select"
+                style="margin-right: 12px;"
+              >
+                {students.map((s) => (
+                  <option value={s.user_id} selected={s.user_id === viewUserId}>
+                    {s.user_name}
+                  </option>
+                ))}
+              </select>
+            )
+          }
+          <select id="month-selector" class="dtr-select">
+            {
+              Array.from({ length: 12 }).map((_, i) => (
+                <option value={i + 1} selected={month === i + 1}>
+                  {new Date(0, i).toLocaleString("en-US", { month: "long" })}
+                </option>
+              ))
+            }
+          </select>
+          <select id="year-selector" class="dtr-select">
+            {
+              [2024, 2025, 2026].map((y) => (
+                <option value={y} selected={year === y}>
+                  {y}
+                </option>
+              ))
+            }
+          </select>
         </div>
         <button onclick="window.print()" class="print-btn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            ><path
+              d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"
+            ></path><rect x="6" y="14" width="12" height="8"></rect>
+          </svg>
           Print / Download DTR
         </button>
       </div>
@@ -145,23 +188,23 @@ const needsUpdate =
         <div class="dtr-container" id="dtr-sheet">
           <header class="dtr-header">
             <div class="dtr-title">OJT DAILY TIME RECORD</div>
-            
+
             <div class="dtr-info-grid">
               <div class="info-item">
                 <span class="label">OJT Student:</span>
-                <span class="value underline">{user.name}</span>
+                <span class="value underline">{settings.userName}</span>
               </div>
               <div class="info-item">
                 <span class="label">Program:</span>
                 <span class="value underline">{settings.program}</span>
               </div>
               <div class="info-item">
-                <span class="label">Host Company:</span>
+                <span class="label">Company:</span>
                 <span class="value underline">{settings.hostCompany}</span>
               </div>
               <div class="info-item">
                 <span class="label">Period:</span>
-                <span class="value underline">Month/Year: {monthName} {year}</span>
+                <span class="value underline">{monthName} {year}</span>
               </div>
               <div class="info-item">
                 <span class="label">Supervisor:</span>
@@ -190,22 +233,29 @@ const needsUpdate =
               </tr>
             </thead>
             <tbody>
-              {Object.entries(dtrData).map(([day, data]: [string, any]) => (
-                <tr class={data.totalSeconds === 0 ? 'weekend-row' : ''}>
-                  <td class="date-col">{day}</td>
-                  <td>{data.amIn}</td>
-                  <td>{data.amOut}</td>
-                  <td>{data.pmIn}</td>
-                  <td>{data.pmOut}</td>
-                  <td class="total-col">{data.totalSeconds > 0 ? formatDuration(data.totalSeconds) : ''}</td>
-                </tr>
-              ))}
+              {
+                Object.entries(dtrData).map(([day, data]: [string, any]) => (
+                  <tr class={data.totalSeconds === 0 ? "weekend-row" : ""}>
+                    <td class="date-col">{day}</td>
+                    <td>{data.amIn}</td>
+                    <td>{data.amOut}</td>
+                    <td>{data.pmIn}</td>
+                    <td>{data.pmOut}</td>
+                    <td class="total-col">
+                      {data.totalSeconds > 0
+                        ? formatDuration(data.totalSeconds)
+                        : ""}
+                    </td>
+                  </tr>
+                ))
+              }
             </tbody>
           </table>
 
           <footer class="dtr-footer">
             <div class="certification">
-              Student Certification: I certify that I rendered the above service.
+              Student Certification: I certify that I rendered the above
+              service.
             </div>
             <div class="sig-lines">
               <div class="sig-group">
@@ -218,9 +268,7 @@ const needsUpdate =
               </div>
             </div>
 
-            <div class="approval">
-              VERIFIED & APPROVED:
-            </div>
+            <div class="approval">VERIFIED & APPROVED:</div>
             <div class="sig-lines">
               <div class="sig-group full">
                 <span class="sig-label">Supervisor Signature:</span>
@@ -242,138 +290,353 @@ const needsUpdate =
   </div>
 </Layout>
 
+<script is:inline>
+  const sSel = document.getElementById("student-selector");
+  const mSel = document.getElementById("month-selector");
+  const ySel = document.getElementById("year-selector");
+
+  const update = () => {
+    let url = `/dtr?month=${mSel.value}&year=${ySel.value}`;
+    if (sSel?.value) url += `&studentId=${sSel.value}`;
+    window.location.href = url;
+  };
+
+  sSel?.addEventListener("change", update);
+  mSel?.addEventListener("change", update);
+  ySel?.addEventListener("change", update);
+</script>
+
 <style>
-  #portal-body { display: flex; min-height: 100vh; padding-top: 56px; }
-  #portal-main { margin-left: 220px; flex: 1; padding: 40px; position: relative; }
-  
+  #portal-body {
+    display: flex;
+    min-height: 100vh;
+    padding-top: 56px;
+  }
+  #portal-main {
+    margin-left: 220px;
+    flex: 1;
+    padding: 40px;
+    position: relative;
+  }
+  .bg-grid {
+    position: fixed;
+    inset: 0;
+    background-image: linear-gradient(
+        rgba(237, 102, 33, 0.04) 1px,
+        transparent 1px
+      ),
+      linear-gradient(90deg, rgba(237, 102, 33, 0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
   .settings-alert {
-    display: flex; justify-content: space-between; align-items: center;
-    background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3);
-    border-radius: 10px; padding: 12px 20px; margin-bottom: 24px;
-    max-width: 800px; margin-left: auto; margin-right: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(251, 191, 36, 0.1);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    border-radius: 10px;
+    padding: 12px 20px;
+    margin-bottom: 24px;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
   }
-  .alert-content { display: flex; align-items: center; gap: 12px; color: #fbbf24; font-size: 14px; font-weight: 500; }
-  .alert-link { 
-    color: #fbbf24; text-decoration: underline; font-size: 13px; font-weight: 700; 
-    transition: all 0.2s; 
-  }
-  .alert-link:hover { color: white; }
-
-  @media (max-width: 900px) {
-    #portal-main { margin-left: 0; padding: 24px 16px; }
-    .actions-bar { flex-direction: column; gap: 16px; align-items: stretch; }
-    .print-btn { justify-content: center; }
-  }
-
-  .actions-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; max-width: 800px; margin-left: auto; margin-right: auto; }
-  .month-selector select { 
-    background: rgba(255,255,255,0.05); 
-    border: 1px solid var(--border-subtle); 
-    color: white; 
-    padding: 8px 12px; 
-    border-radius: 6px; 
-    outline: none;
+  .alert-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #fbbf24;
     font-size: 14px;
     font-weight: 500;
   }
-  
-  .month-selector select option {
-    background: #1a1a2e;
+  .alert-link {
+    color: #fbbf24;
+    text-decoration: underline;
+    font-size: 13px;
+    font-weight: 700;
+    transition: all 0.2s;
+  }
+  .alert-link:hover {
     color: white;
-    padding: 8px;
   }
-  
-  .print-btn { 
-    display: flex; align-items: center; gap: 8px; background: var(--ntv-gradient); color: white; border: none; 
-    padding: 10px 18px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+
+  .actions-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
   }
-  .print-btn:hover { background: var(--ntv-red); transform: translateY(-1px); }
+  .dtr-select {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-subtle);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    outline: none;
+    font-size: 14px;
+  }
+  .dtr-select option {
+    background: #111827;
+    color: white;
+  }
+  .print-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--ntv-gradient);
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  .print-btn:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+  }
 
   .dtr-scroll-wrapper {
     width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 20px;
+    overflow: visible;
+    padding: 40px 20px;
+    background: rgba(0, 0, 0, 0.2);
+    display: flex;
+    justify-content: center;
   }
 
-  /* DTR Styling - Matching the Screenshot */
-  .dtr-container { 
-    background: white; color: black; padding: 40px; width: 800px; margin: 0 auto;
-    font-family: Arial, sans-serif; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-radius: 4px;
+  .dtr-container {
+    background: white;
+    color: black;
+    padding: 0.1in 0.4in;
+    width: 8.5in;
+    height: 11in;
+    margin: 0 auto;
+    font-family: Arial, sans-serif;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    border-radius: 2px;
+    display: flex;
+    flex-direction: column;
   }
 
-  .dtr-title { text-align: center; font-size: 20px; font-weight: 700; background: #d1d5db; padding: 8px; border: 2px solid #9ca3af; border-bottom: none; }
-  
-  .dtr-info-grid { 
-    display: grid; grid-template-columns: 1fr 1fr; border: 2px solid #9ca3af; 
-    border-top: none; background: #f3f4f6; 
+  .dtr-title {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 700;
+    background: #d1d5db;
+    padding: 8px;
+    border: 3px solid #9ca3af;
+    border-bottom: none;
   }
-  .info-item { padding: 8px 12px; border-right: 1px solid #9ca3af; border-bottom: 1px solid #9ca3af; font-size: 13px; display: flex; gap: 6px; }
-  .info-item:nth-child(even) { border-right: none; }
-  .info-item.highlight { background: #e5e7eb; font-weight: 700; }
-  .label { font-weight: 600; width: 100px; }
-  .underline { text-decoration: underline; }
+  .dtr-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border: 3px solid #9ca3af;
+    border-top: none;
+    background: #f3f4f6;
+  }
+  .info-item {
+    padding: 6px 12px;
+    border-right: 1px solid #9ca3af;
+    border-bottom: 2px solid #9ca3af;
+    font-size: 12px;
+    display: flex;
+    gap: 6px;
+  }
+  .info-item:nth-child(even) {
+    border-right: none;
+  }
+  .info-item.highlight {
+    background: #e5e7eb;
+    font-weight: 700;
+  }
+  .label {
+    font-weight: 600;
+    width: 100px;
+  }
+  .underline {
+    text-decoration: underline;
+  }
 
-  .dtr-table { width: 100%; border-collapse: collapse; border: 2px solid #9ca3af; margin-top: -2px; }
-  .dtr-table th { background: #d1d5db; border: 1px solid #9ca3af; padding: 6px; font-size: 12px; font-weight: 700; text-align: center; }
-  .dtr-table td { border: 1px solid #9ca3af; padding: 4px 8px; font-size: 12px; height: 24px; text-align: center; }
-  .date-col { font-weight: 700; background: #f9fafb; width: 50px; }
-  .total-col { font-weight: 700; background: #f9fafb; }
-  .weekend-row { background: #fef2f2; }
+  .dtr-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 3px solid #9ca3af;
+    margin-top: -3px;
+    flex-grow: 1;
+  }
+  .dtr-table th {
+    background: #d1d5db;
+    border: 2px solid #9ca3af;
+    padding: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+  }
+  .dtr-table td {
+    border: 1px solid #9ca3af;
+    padding: 2px 8px;
+    font-size: 11px;
+    height: 17px;
+    text-align: center;
+  }
+  .date-col {
+    font-weight: 700;
+    background: #f9fafb;
+    width: 50px;
+  }
+  .total-col {
+    font-weight: 700;
+    background: #f9fafb;
+  }
+  .weekend-row {
+    background: #fef2f2;
+  }
 
-  .dtr-footer { margin-top: 20px; font-size: 12px; }
-  .certification { font-weight: 700; margin-bottom: 15px; }
-  .approval { font-weight: 700; margin-top: 25px; margin-bottom: 15px; }
-  
-  .sig-lines { display: flex; gap: 40px; align-items: flex-end; margin-bottom: 15px; }
-  .sig-group { display: flex; align-items: flex-end; gap: 8px; }
-  .sig-group.full { flex: 1; }
-  .sig-underline { border-bottom: 1px solid black; min-width: 150px; height: 18px; }
-  .sig-label { font-weight: 700; white-space: nowrap; }
+  .dtr-footer {
+    margin-top: auto;
+    padding-top: 15px;
+    font-size: 11px;
+  }
+  .certification {
+    font-weight: 700;
+    margin-bottom: 10px;
+    font-size: 12px;
+  }
+  .sig-lines {
+    display: flex;
+    gap: 30px;
+    align-items: flex-end;
+    margin-bottom: 10px;
+  }
+  .sig-group {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+  }
+  .sig-group.full {
+    flex: 1;
+  }
+  .sig-underline {
+    border-bottom: 2px solid black;
+    min-width: 140px;
+    height: 16px;
+  }
+  .sig-label {
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .approval {
+    font-weight: 700;
+    margin-top: 15px;
+    margin-bottom: 10px;
+    font-size: 12px;
+  }
 
   @media print {
-    @page { 
-      margin: 0.4cm;
+    @page {
+      margin: 0;
       size: letter portrait;
     }
+
+    body { 
+      margin: 0; 
+      padding: 0; 
+      background: white !important;
+      display: flex !important;
+      justify-content: center;
+      align-items: flex-start;
+    }
     
-    /* Hide nav elements */
-    #sys-header, #sidebar, .no-print, .dash-greeting, .sync-status { display: none !important; }
-    
-    /* Reset layout for print */
-    #portal-body { display: block !important; padding: 0 !important; min-height: auto !important; }
-    #portal-main { margin: 0 !important; padding: 0 !important; }
-    
-    /* DTR container */
-    .dtr-container { 
-      width: 100% !important;
-      max-width: 100% !important;
-      box-shadow: none !important;
-      padding: 0 !important;
-      margin: 0 !important;
-      border-radius: 0 !important;
-      color: black !important;
-      page-break-inside: avoid;
+    #header,
+    #sidebar,
+    .no-print,
+    .bg-grid {
+      display: none !important;
     }
 
-    .dtr-header { margin-bottom: 10px; }
-    .dtr-title { padding: 6px; font-size: 18px; }
-    .info-item { padding: 5px 10px; font-size: 12px; }
-    .label { width: 90px; }
+    #portal-body, #portal-main, .dtr-scroll-wrapper {
+      display: block !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      background: white !important;
+    }
     
-    .dtr-table th { padding: 4px; font-size: 11px; }
-    .dtr-table td { padding: 4px 6px; font-size: 11px; height: 22px; }
-    
-    .dtr-footer { margin-top: 15px; font-size: 11px; }
-    .certification { margin-bottom: 12px; font-size: 12px; }
-    .approval { margin-top: 15px; margin-bottom: 10px; font-size: 12px; }
-    .sig-lines { gap: 25px; margin-bottom: 15px; }
-    .sig-underline { height: 16px; min-width: 150px; }
-    .sig-label { font-size: 12px; }
+    .dtr-container {
+      margin: 0 auto !important;
+      width: 8.5in !important;
+      height: 11in !important;
+      box-shadow: none !important;
+      border: none !important;
+      padding: 0.1in 0.4in !important;
+    }
   }
 
-  @media (max-width: 850px) {
-    .dtr-container { padding: 20px; width: 800px; margin: 0; }
-    .dtr-scroll-wrapper { padding: 0 10px 20px; }
+    .dtr-title {
+      padding: 8px;
+      font-size: 18px;
+      border-width: 3px;
+    }
+    .dtr-info-grid {
+      border-width: 3px;
+    }
+    .info-item {
+      padding: 6px 12px;
+      font-size: 11px;
+      border-bottom-width: 2px;
+    }
+
+    .dtr-table {
+      border-width: 3px;
+      margin-top: -3px;
+      flex-grow: 1;
+    }
+    .dtr-table th {
+      padding: 4px;
+      font-size: 10px;
+      border-width: 2px;
+    }
+    .dtr-table td {
+      padding: 2px 8px;
+      font-size: 11px;
+      height: 17px;
+      border-width: 1px;
+      border-color: #000;
+    }
+    .date-col,
+    .total-col {
+      border-width: 2px;
+    }
+
+    .dtr-footer {
+      margin-top: auto;
+      padding-top: 15px;
+      font-size: 11px;
+    }
+    .certification {
+      margin-bottom: 10px;
+      font-size: 12px;
+    }
+    .sig-lines {
+      gap: 30px;
+      margin-bottom: 10px;
+    }
+    .sig-underline {
+      min-width: 140px;
+      height: 16px;
+      border-bottom: 2px solid #000;
+    }
+    .approval {
+      margin-top: 15px;
+      margin-bottom: 10px;
+      font-size: 12px;
+    }
   }
 </style>

@@ -17,12 +17,26 @@ if (!user) {
 const settings = await getAppSettings(user.id);
 const isClockifySet = !!(import.meta.env.CLOCKIFY_API_KEY && import.meta.env.CLOCKIFY_WORKSPACE_ID);
 const success = Astro.url.searchParams.get('success') === 'true';
+
+// Fetch coordinator name if linked
+let coordinatorName = '';
+if (settings.coordinatorId) {
+  const { supabase } = await import('../lib/supabase');
+  const { data: coord } = await supabase
+    .from('coordinator_settings')
+    .select('user_name')
+    .eq('user_id', settings.coordinatorId)
+    .single();
+  if (coord) coordinatorName = coord.user_name;
+}
+
+const isLinked = settings.role === 'student' && !!settings.coordinatorId;
 ---
 <Layout>
   <Header user={user} />
 
   <div id="portal-body">
-    <Sidebar user={user} activeTab="settings" />
+    <Sidebar user={user} activeTab="settings" role={settings.role} />
 
     <main id="portal-main">
       <div class="bg-grid" aria-hidden="true"></div>
@@ -35,115 +49,153 @@ const success = Astro.url.searchParams.get('success') === 'true';
         </div>
 
         <div class="settings-sections">
-          <!-- Profile Section -->
-
-          <section class="settings-card">
-            <h2 class="card-title">OJT Details (For DTR Sheet)</h2>
-            <form action="/api/settings" method="POST" class="settings-form">
-              <input type="hidden" name="setupComplete" value="true" />
-              <input type="hidden" name="redirect" value="/settings" />
-              <input type="hidden" name="startDate" value={settings.startDate} />
-              <input type="hidden" name="targetHours" value={settings.targetHours} />
-              <input type="hidden" name="hourlyRate" value={settings.hourlyRate} />
-              
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="program">Program / Course</label>
-                  <input type="text" id="program" name="program" value={settings.program} placeholder="Enter your program" required />
-                </div>
-              </div>
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="hostCompany">Host Training Establishment (Company)</label>
-                  <input type="text" id="hostCompany" name="hostCompany" value={settings.hostCompany} placeholder="Enter company name" required />
-                </div>
-              </div>
-              <div class="form-row split">
-                <div class="form-group">
-                  <label for="supervisor">Supervisor Name</label>
-                  <input type="text" id="supervisor" name="supervisor" value={settings.supervisor} placeholder="Enter supervisor name" required />
-                </div>
-                <div class="form-group">
-                  <label for="supervisorPosition">Supervisor Position</label>
-                  <input type="text" id="supervisorPosition" name="supervisorPosition" value={settings.supervisorPosition} placeholder="Enter position" required />
-                </div>
-              </div>
-              <button type="submit" class="save-btn">Update DTR Details</button>
-            </form>
-          </section>
-
-          <section class="settings-card">
-            <h2 class="card-title">Program Configuration</h2>
-            <form action="/api/settings" method="POST" class="settings-form">
-              <input type="hidden" name="setupComplete" value="true" />
-              <input type="hidden" name="redirect" value="/settings" />
-              <div class="form-row split">
-                <div class="form-group">
-                  <label class="check-label">
-                    <input type="checkbox" name="hasAllowance" value="true" checked={settings.hasAllowance} id="allowance-toggle-settings" />
-                    <span>Enable Allowance Tracking</span>
-                  </label>
-                </div>
-              </div>
-
-              <div id="allowance-fields-settings" style={settings.hasAllowance ? "" : "display: none;"}>
-                <div class="form-row split">
-                  <div class="form-group">
-                    <label for="payType">Pay Model</label>
-                    <select name="payType" id="payType" class="settings-select">
-                      <option value="hourly" selected={settings.payType === 'hourly'}>Hourly Rate</option>
-                      <option value="daily" selected={settings.payType === 'daily'}>Fixed Daily Rate</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label for="hourlyRate">Rate (₱)</label>
-                    <div class="input-wrapper">
-                      <span class="input-prefix">₱</span>
-                      <input type="number" id="hourlyRate" name="hourlyRate" value={settings.hourlyRate} step="0.5" required />
+          <!-- Student Specific Sections -->
+          {settings.role === 'student' && (
+            <>
+              <section class="settings-card">
+                <h2 class="card-title">OJT Details (For DTR Sheet)</h2>
+                <form action="/api/settings" method="POST" class="settings-form">
+                  <input type="hidden" name="setupComplete" value="true" />
+                  <input type="hidden" name="redirect" value="/settings" />
+                  <input type="hidden" name="startDate" value={settings.startDate} />
+                  <input type="hidden" name="targetHours" value={settings.targetHours} />
+                  <input type="hidden" name="hourlyRate" value={settings.hourlyRate} />
+                  
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label for="program">Program / Course</label>
+                      <input type="text" id="program" name="program" value={settings.program} placeholder="Enter your program" required />
                     </div>
                   </div>
-                </div>
-
-                <div class="form-row">
-                  <div class="form-group">
-                    <label for="paySchedule">Pay Schedule</label>
-                    <select name="paySchedule" id="paySchedule" class="settings-select">
-                      <option value="weekly" selected={settings.paySchedule === 'weekly'}>Every Week</option>
-                      <option value="semi-monthly" selected={settings.paySchedule === 'semi-monthly'}>Semi-monthly (15th/30th)</option>
-                      <option value="monthly" selected={settings.paySchedule === 'monthly'}>Monthly</option>
-                    </select>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label for="hostCompany">Host Training Establishment (Company)</label>
+                      <input type="text" id="hostCompany" name="hostCompany" value={settings.hostCompany} placeholder="Enter company name" required />
+                    </div>
                   </div>
-                </div>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="startDate">Program Start Date</label>
-                  <input type="date" id="startDate" name="startDate" value={settings.startDate} required />
-                  <p class="form-hint">Hours before this date will be ignored.</p>
-                </div>
-              </div>
-              <div class="form-row split">
-                <div class="form-group">
-                  <label for="targetHours">Target Hours</label>
-                  <div class="input-wrapper">
-                    <input type="number" id="targetHours" name="targetHours" value={settings.targetHours} step="0.5" required />
-                    <span class="input-suffix">hrs</span>
+                  <div class="form-row split">
+                    <div class="form-group">
+                      <label for="supervisor">Supervisor Name</label>
+                      <input type="text" id="supervisor" name="supervisor" value={settings.supervisor} placeholder="Enter supervisor name" required />
+                    </div>
+                    <div class="form-group">
+                      <label for="supervisorPosition">Supervisor Position</label>
+                      <input type="text" id="supervisorPosition" name="supervisorPosition" value={settings.supervisorPosition} placeholder="Enter position" required />
+                    </div>
                   </div>
-                </div>
-              </div>
+                  <button type="submit" class="save-btn">Update DTR Details</button>
+                </form>
+              </section>
 
-              <button type="submit" class="save-btn">Save Config</button>
-            </form>
+              <section class="settings-card">
+                <h2 class="card-title">Coordinator Connection</h2>
+                <form action="/api/settings" method="POST" class="settings-form">
+                  <input type="hidden" name="setupComplete" value="true" />
+                  <input type="hidden" name="redirect" value="/settings" />
+                  
+                  {settings.coordinatorId ? (
+                    <div class="linked-info">
+                      <div class="link-status">
+                        <div class="status-dot pulse"></div>
+                        <span>Linked to <strong>{coordinatorName}</strong></span>
+                      </div>
+                      <p class="hint">Your coordinator can now view your progress and DTR logs.</p>
+                    </div>
+                  ) : (
+                    <div class="unlinked-info">
+                      <div class="link-status unlinked">
+                        <div class="status-dot gray"></div>
+                        <span>Not linked to a coordinator</span>
+                      </div>
+                    </div>
+                  )}
 
-            <script is:inline>
-              document.getElementById('allowance-toggle-settings')?.addEventListener('change', (e) => {
-                const fields = document.getElementById('allowance-fields-settings');
-                if (fields) fields.style.display = e.target.checked ? 'block' : 'none';
-              });
-            </script>
-          </section>
+                  <div class="form-group mt-16">
+                    <label for="coordinatorInvite">Update Invite Code</label>
+                    <div class="input-with-btn">
+                      <input type="text" id="coordinatorInvite" name="coordinatorInvite" placeholder="Enter 6-digit code" />
+                      <button type="submit" class="apply-btn">Link</button>
+                    </div>
+                    <p class="form-hint">Paste the code given by your OJT Coordinator to sync your progress.</p>
+                  </div>
+                </form>
+              </section>
 
+              <section class="settings-card">
+                <h2 class="card-title">Program Configuration</h2>
+                <form action="/api/settings" method="POST" class="settings-form">
+                  <input type="hidden" name="setupComplete" value="true" />
+                  <input type="hidden" name="redirect" value="/settings" />
+                  <div class="form-row split">
+                    <div class="form-group">
+                      <label class="check-label">
+                        <input type="checkbox" name="hasAllowance" value="true" checked={settings.hasAllowance} id="allowance-toggle-settings" />
+                        <span>Enable Allowance Tracking</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div id="allowance-fields-settings" style={settings.hasAllowance ? "" : "display: none;"}>
+                    <div class="form-row split">
+                      <div class="form-group">
+                        <label for="payType">Pay Model</label>
+                        <select name="payType" id="payType" class="settings-select">
+                          <option value="hourly" selected={settings.payType === 'hourly'}>Hourly Rate</option>
+                          <option value="daily" selected={settings.payType === 'daily'}>Fixed Daily Rate</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label for="hourlyRate">Rate (₱)</label>
+                        <div class="input-wrapper">
+                          <span class="input-prefix">₱</span>
+                          <input type="number" id="hourlyRate" name="hourlyRate" value={settings.hourlyRate} step="0.5" required />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label for="paySchedule">Pay Schedule</label>
+                        <select name="paySchedule" id="paySchedule" class="settings-select">
+                          <option value="weekly" selected={settings.paySchedule === 'weekly'}>Every Week</option>
+                          <option value="semi-monthly" selected={settings.paySchedule === 'semi-monthly'}>Semi-monthly (15th/30th)</option>
+                          <option value="monthly" selected={settings.paySchedule === 'monthly'}>Monthly</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label for="startDate">Program Start Date</label>
+                      <input type="date" id="startDate" name="startDate" value={settings.startDate} required />
+                      <p class="form-hint">Hours before this date will be ignored.</p>
+                    </div>
+                  </div>
+                  <div class="form-row split">
+                    <div class="form-group">
+                      <label for="targetHours">Target Hours</label>
+                      <div class="input-wrapper">
+                        <input type="number" id="targetHours" name="targetHours" value={settings.targetHours} step="0.5" required />
+                        <span class="input-suffix">hrs</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button type="submit" class="save-btn">Save Config</button>
+                </form>
+
+                <script is:inline>
+                  document.getElementById('allowance-toggle-settings')?.addEventListener('change', (e) => {
+                    const fields = document.getElementById('allowance-fields-settings');
+                    if (fields) fields.style.display = e.target.checked ? 'block' : 'none';
+                  });
+                </script>
+              </section>
+            </>
+          )}
+
+          <!-- Common Sections -->
           <section class="settings-card">
             <h2 class="card-title">Profile Information</h2>
             <div class="profile-preview">
@@ -161,30 +213,46 @@ const success = Astro.url.searchParams.get('success') === 'true';
             </div>
           </section>
 
-          <!-- Integration Section -->
-          <section class="settings-card">
-            <h2 class="card-title">Clockify Integration</h2>
-            <div class="integration-status">
-              <div class={`status-badge ${isClockifySet ? 'connected' : 'disconnected'}`}>
-                {isClockifySet ? 'Connected' : 'Missing Credentials'}
+          <!-- Coordinator Invite Code (Only for Coordinators) -->
+          {settings.role === 'coordinator' && (
+            <section class="settings-card">
+              <h2 class="card-title">Coordinator Settings</h2>
+              <div class="detail-group">
+                <label>Your Invite Code</label>
+                <div class="read-only-box" style="font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; color: var(--ntv-orange);">
+                  {settings.inviteCode}
+                </div>
+                <p class="form-hint mt-8">Students can join your roster using this code during their setup.</p>
               </div>
-              <p class="status-desc">
-                {isClockifySet 
-                  ? 'Your system is currently syncing with Clockify using the environment variables provided.' 
-                  : 'Update your .env file with CLOCKIFY_API_KEY and CLOCKIFY_WORKSPACE_ID to enable syncing.'}
-              </p>
-            </div>
-            <div class="config-help">
-              <div class="help-item">
-                <span class="help-label">Sync Frequency</span>
-                <span class="help-value">Real-time (On Request)</span>
+            </section>
+          )}
+
+          <!-- Integration Section (Students Only) -->
+          {settings.role === 'student' && (
+            <section class="settings-card">
+              <h2 class="card-title">Clockify Integration</h2>
+              <div class="integration-status">
+                <div class={`status-badge ${isClockifySet ? 'connected' : 'disconnected'}`}>
+                  {isClockifySet ? 'Connected' : 'Missing Credentials'}
+                </div>
+                <p class="status-desc">
+                  {isClockifySet 
+                    ? 'Your system is currently syncing with Clockify using the environment variables provided.' 
+                    : 'Update your .env file with CLOCKIFY_API_KEY and CLOCKIFY_WORKSPACE_ID to enable syncing.'}
+                </p>
               </div>
-              <div class="help-item">
-                <span class="help-label">Target Hours</span>
-                <span class="help-value">{settings.targetHours.toFixed(2)}</span>
+              <div class="config-help">
+                <div class="help-item">
+                  <span class="help-label">Sync Frequency</span>
+                  <span class="help-value">Real-time (On Request)</span>
+                </div>
+                <div class="help-item">
+                  <span class="help-label">Target Hours</span>
+                  <span class="help-value">{settings.targetHours.toFixed(2)}</span>
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
+          )}
 
           <!-- Danger Zone -->
           <section class="settings-card danger">
@@ -200,7 +268,7 @@ const success = Astro.url.searchParams.get('success') === 'true';
             <div class="danger-item mt-24">
               <div class="danger-info">
                 <h3>Delete Account</h3>
-                <p>Permanently remove your profile and all your time-tracking data. This action is irreversible.</p>
+                <p>Permanently remove your profile and all your data. This action is irreversible.</p>
               </div>
               <button type="button" id="open-delete-modal" class="danger-btn solid">Delete My Account</button>
             </div>
@@ -208,7 +276,7 @@ const success = Astro.url.searchParams.get('success') === 'true';
         </div>
       </div>
       
-      <!-- DELETE MODAL (Moved outside content for better layering) -->
+      <!-- DELETE MODAL -->
       <div id="delete-modal" class="modal-overlay">
         <div class="modal-content">
           <div class="modal-header-danger">
@@ -217,7 +285,7 @@ const success = Astro.url.searchParams.get('success') === 'true';
             </div>
             <h2>Delete your account?</h2>
           </div>
-          <p class="modal-desc">This will permanently delete your profile, all settings, and **ALL your time-tracking records**. This action cannot be undone.</p>
+          <p class="modal-desc">This will permanently delete your profile, all settings, and **ALL your records**. This action cannot be undone.</p>
           <div class="modal-actions">
             <button type="button" id="close-delete-modal" class="btn-cancel">Cancel, Keep Data</button>
             <form action="/api/auth/delete-account" method="POST">
@@ -230,12 +298,16 @@ const success = Astro.url.searchParams.get('success') === 'true';
   </div>
 </Layout>
 
-<script is:inline>
+<script define:vars={{ isLinked }}>
   const deleteModal = document.getElementById('delete-modal');
   const openBtn = document.getElementById('open-delete-modal');
   const closeBtn = document.getElementById('close-delete-modal');
 
   openBtn?.addEventListener('click', () => {
+    if (isLinked) {
+      window.showToast('You must unlink from your coordinator first before deleting your account.', 'error');
+      return;
+    }
     deleteModal?.classList.add('active');
     document.body.style.overflow = 'hidden';
   });
@@ -258,14 +330,11 @@ const success = Astro.url.searchParams.get('success') === 'true';
       document.body.style.overflow = 'hidden';
     }
   });
-</script>
 
-<script is:inline>
   // Check for success or error in URL
   const params = new URLSearchParams(window.location.search);
   if (params.get('success') === 'true') {
     window.showToast('Settings updated successfully!', 'success');
-    // Clean up URL without refreshing
     const newUrl = window.location.pathname;
     window.history.replaceState({}, '', newUrl);
   }
@@ -333,7 +402,6 @@ const success = Astro.url.searchParams.get('success') === 'true';
   .danger-btn.solid { background: #e61e2a; color: white; }
   .danger-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(230, 30, 42, 0.2); filter: brightness(1.1); }
 
-  /* DELETE MODAL STYLES */
   .modal-overlay {
     position: fixed; inset: 0; background: rgba(5, 11, 22, 0.85);
     backdrop-filter: blur(8px); z-index: 2000; display: flex;
@@ -341,16 +409,12 @@ const success = Astro.url.searchParams.get('success') === 'true';
     opacity: 0; pointer-events: none; transition: opacity 0.3s;
   }
   .modal-overlay.active { opacity: 1; pointer-events: auto; }
-  
   .modal-content {
     background: #0d1421; border: 1px solid rgba(230, 30, 42, 0.4);
     border-radius: 20px; width: 100%; max-width: 440px; padding: 32px;
-    box-shadow: 0 24px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.05) inset;
     transform: scale(0.95) translateY(10px); transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    position: relative; z-index: 2100;
   }
   .modal-overlay.active .modal-content { transform: scale(1) translateY(0); }
-  
   .modal-header-danger { text-align: center; margin-bottom: 20px; }
   .warning-icon { 
     display: inline-flex; align-items: center; justify-content: center;
@@ -360,69 +424,58 @@ const success = Astro.url.searchParams.get('success') === 'true';
   }
   .modal-header-danger h2 { font-size: 22px; font-weight: 700; color: #fff; }
   .modal-desc { font-size: 14px; color: var(--text-secondary); text-align: center; line-height: 1.6; margin-bottom: 32px; }
-  .modal-desc strong { color: #fff; }
-  
   .modal-actions { display: flex; flex-direction: column; gap: 12px; }
-  .btn-confirm-delete {
-    width: 100%; padding: 14px; background: #e61e2a; color: #fff;
-    border: none; border-radius: 12px; font-size: 14px; font-weight: 700;
-    cursor: pointer; transition: all 0.2s;
-  }
-  .btn-confirm-delete:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 4px 15px rgba(230, 30, 42, 0.3); }
-  
-  .btn-cancel {
-    width: 100%; padding: 14px; background: rgba(255, 255, 255, 0.05); color: var(--text-primary);
-    border: 1px solid var(--border-subtle); border-radius: 12px; font-size: 14px; font-weight: 600;
-    cursor: pointer; transition: all 0.2s;
-  }
-  .btn-cancel:hover { background: rgba(255, 255, 255, 0.08); }
+  .btn-confirm-delete { width: 100%; padding: 14px; background: #e61e2a; color: #fff; border: none; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .btn-cancel { width: 100%; padding: 14px; background: rgba(255, 255, 255, 0.05); color: var(--text-primary); border: 1px solid var(--border-subtle); border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
 
   .settings-form { display: flex; flex-direction: column; gap: 20px; }
   .form-row.split { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
   .form-group { display: flex; flex-direction: column; gap: 8px; }
   .form-group label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--text-secondary); }
   .form-hint { font-size: 11px; color: var(--text-secondary); margin-top: 2px; opacity: 0.6; }
+  .mt-8 { margin-top: 8px; }
+  .mt-16 { margin-top: 16px; }
 
   input[type="date"], input[type="number"], input[type="text"] {
     background: rgba(255,255,255,.03); border: 1px solid var(--border-subtle);
     border-radius: 8px; padding: 12px 14px; color: var(--text-primary); font-size: 14px;
-    transition: all 0.2s;
   }
-  input:focus { outline: none; border-color: var(--ntv-orange); background: rgba(255,255,255,.05); box-shadow: 0 0 0 3px rgba(237, 102, 33, 0.1); }
-
   .input-wrapper { position: relative; display: flex; align-items: center; }
   .input-wrapper input { width: 100%; }
-  .check-label { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px; color: var(--text-primary); margin-bottom: 4px; }
-  .check-label input { width: auto; cursor: pointer; }
-  .settings-select { 
-    width: 100%; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); 
-    border-radius: 8px; padding: 12px 14px; color: #fff; font-size: 14px; 
-    font-family: 'Outfit', sans-serif; outline: none; cursor: pointer;
-  }
-  .settings-select option { background: #0d1421; color: #fff; }
-  .settings-select:focus { border-color: var(--ntv-orange); }
-
-  .input-wrapper .input-prefix + input { padding-left: 32px; }
+  .input-prefix { position: absolute; left: 12px; font-size: 14px; color: var(--text-secondary); }
+  .input-prefix + input { padding-left: 32px; }
+  .input-suffix { position: absolute; right: 12px; font-size: 12px; color: var(--text-secondary); }
   .input-wrapper input:has(+ .input-suffix) { padding-right: 48px; }
 
-  .save-btn {
-    align-self: flex-start;
-    padding: 12px 24px; background: var(--ntv-gradient);
-    color: white; border: none; border-radius: 8px;
-    font-size: 14px; font-weight: 600; cursor: pointer;
-    transition: all 0.2s;
-  }
-  .save-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(237, 102, 33, 0.3); }
-  .save-btn:active { transform: translateY(0); }
+  .check-label { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px; color: var(--text-primary); }
+  .settings-select { width: 100%; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 12px 14px; color: #fff; font-size: 14px; }
+  
+  .save-btn { align-self: flex-start; padding: 12px 24px; background: var(--ntv-gradient); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  
+  .linked-info, .unlinked-info { margin-bottom: 20px; }
+  .link-status { display: flex; align-items: center; gap: 10px; font-size: 14px; color: #fff; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .status-dot.pulse { background: #34d399; box-shadow: 0 0 10px #34d399; animation: pulse-status 2s infinite; }
+  .status-dot.gray { background: #64748b; }
+  @keyframes pulse-status { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+  .hint { font-size: 12px; color: var(--text-secondary); margin-top: 6px; }
+  .input-with-btn { display: flex; gap: 10px; }
+  .input-with-btn input { flex: 1; }
+  .apply-btn { background: rgba(237, 102, 33, 0.1); border: 1px solid rgba(237, 102, 33, 0.3); color: var(--ntv-orange); padding: 0 16px; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer; }
 
   @media (max-width: 900px) { 
     #portal-main { margin-left: 0; padding: 24px 16px; } 
-    .page-header h1 { font-size: 24px; }
-    .settings-card { padding: 20px; }
-    .profile-preview { flex-direction: column; align-items: stretch; gap: 16px; } 
-    .profile-img { align-self: center; }
-    .config-help { flex-direction: column; gap: 16px; } 
+    #settings-content { width: 100%; max-width: 100%; }
     .form-row.split { grid-template-columns: 1fr; } 
-    .save-btn { align-self: stretch; text-align: center; }
+    .profile-preview { flex-direction: column; align-items: center; text-align: center; }
+    .read-only-box { text-align: left; }
+    .danger-item { flex-direction: column; align-items: flex-start; }
+    .danger-btn { width: 100%; justify-content: center; }
+    .config-help { flex-direction: column; gap: 16px; }
+  }
+
+  @media (max-width: 480px) {
+    .settings-card { padding: 20px; }
+    .page-header h1 { font-size: 24px; }
   }
 </style>

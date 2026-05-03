@@ -12,74 +12,119 @@ export interface AppSettings {
   hasAllowance: boolean;
   payType: 'hourly' | 'daily';
   paySchedule: 'weekly' | 'semi-monthly' | 'monthly';
+  role: 'student' | 'coordinator';
+  inviteCode?: string;
+  coordinatorId?: string;
+  userName?: string;
+  userEmail?: string;
+  userPicture?: string;
 }
 
-const DEFAULT_SETTINGS: AppSettings = {
+export const DEFAULT_SETTINGS: AppSettings = {
   startDate: '2024-01-01',
   targetHours: 480,
   hourlyRate: 60,
   setupComplete: false,
-  program: 'Enter Program / Course',
-  hostCompany: 'Enter Host Company',
-  supervisor: 'Enter Supervisor Name',
-  supervisorPosition: 'Enter Position',
+  program: '',
+  hostCompany: '',
+  supervisor: '',
+  supervisorPosition: '',
   hasAllowance: true,
   payType: 'hourly',
   paySchedule: 'monthly',
+  role: 'student'
 };
 
 export async function getAppSettings(userId: string): Promise<AppSettings> {
-  try {
-    const { data, error } = await supabase
-      .from('settings')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
+  // Check Coordinator table first
+  const { data: coordData } = await supabase
+    .from('coordinator_settings')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
 
-    if (error || !data) {
-      return DEFAULT_SETTINGS;
-    }
-
+  if (coordData) {
     return {
-      startDate: data.start_date,
-      targetHours: Number(data.target_hours),
-      hourlyRate: Number(data.hourly_rate),
-      setupComplete: data.setup_complete,
-      program: data.program || DEFAULT_SETTINGS.program,
-      hostCompany: data.host_company || DEFAULT_SETTINGS.hostCompany,
-      supervisor: data.supervisor || DEFAULT_SETTINGS.supervisor,
-      supervisorPosition: data.supervisor_position || DEFAULT_SETTINGS.supervisorPosition,
-      hasAllowance: data.has_allowance ?? DEFAULT_SETTINGS.hasAllowance,
-      payType: data.pay_type || DEFAULT_SETTINGS.payType,
-      paySchedule: data.pay_schedule || DEFAULT_SETTINGS.paySchedule,
+      ...DEFAULT_SETTINGS,
+      role: 'coordinator',
+      inviteCode: coordData.invite_code,
+      userName: coordData.user_name,
+      userEmail: coordData.user_email,
+      userPicture: coordData.user_picture,
+      setupComplete: true
     };
-  } catch (e) {
-    return DEFAULT_SETTINGS;
   }
+
+  // Check Student table
+  const { data: studentData } = await supabase
+    .from('student_settings')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
+
+  if (studentData) {
+    return {
+      startDate: studentData.start_date,
+      targetHours: studentData.target_hours,
+      hourlyRate: studentData.hourly_rate,
+      setupComplete: studentData.setup_complete,
+      program: studentData.program,
+      hostCompany: studentData.host_company,
+      supervisor: studentData.supervisor,
+      supervisorPosition: studentData.supervisor_position,
+      hasAllowance: studentData.has_allowance,
+      payType: studentData.pay_type,
+      paySchedule: studentData.pay_schedule,
+      role: 'student',
+      coordinatorId: studentData.coordinator_id,
+      userName: studentData.user_name,
+      userEmail: studentData.user_email,
+      userPicture: studentData.user_picture
+    };
+  }
+
+  return { ...DEFAULT_SETTINGS };
 }
 
-export async function saveAppSettings(userId: string, settings: Partial<AppSettings>) {
-  const current = await getAppSettings(userId);
-  const updated = { ...current, ...settings };
+export async function saveAppSettings(userId: string, updated: Partial<AppSettings>) {
+  if (updated.role === 'coordinator') {
+    // Delete from student table if they switched (unlikely but safe)
+    await supabase.from('student_settings').delete().eq('user_id', userId);
+    
+    return await supabase
+      .from('coordinator_settings')
+      .upsert({
+        user_id: userId,
+        user_name: updated.userName,
+        user_email: updated.userEmail,
+        user_picture: updated.userPicture,
+        invite_code: updated.inviteCode,
+        updated_at: new Date().toISOString()
+      });
+  } else {
+    // Delete from coordinator table if they switched
+    await supabase.from('coordinator_settings').delete().eq('user_id', userId);
 
-  const { error } = await supabase
-    .from('settings')
-    .upsert({
-      user_id: userId,
-      start_date: updated.startDate,
-      target_hours: updated.targetHours,
-      hourly_rate: updated.hourlyRate,
-      setup_complete: updated.setupComplete,
-      program: updated.program,
-      host_company: updated.hostCompany,
-      supervisor: updated.supervisor,
-      supervisor_position: updated.supervisorPosition,
-      has_allowance: updated.hasAllowance,
-      pay_type: updated.payType,
-      pay_schedule: updated.paySchedule,
-      updated_at: new Date().toISOString(),
-    });
-
-  if (error) throw error;
-  return updated;
+    return await supabase
+      .from('student_settings')
+      .upsert({
+        user_id: userId,
+        user_name: updated.userName,
+        user_email: updated.userEmail,
+        user_picture: updated.userPicture,
+        coordinator_id: updated.coordinatorId,
+        start_date: updated.startDate || DEFAULT_SETTINGS.startDate,
+        target_hours: updated.targetHours || DEFAULT_SETTINGS.targetHours,
+        hourly_rate: updated.hourlyRate || DEFAULT_SETTINGS.hourlyRate,
+        setup_complete: updated.setupComplete ?? DEFAULT_SETTINGS.setupComplete,
+        program: updated.program,
+        host_company: updated.hostCompany,
+        supervisor: updated.supervisor,
+        supervisor_position: updated.supervisorPosition,
+        has_allowance: updated.hasAllowance ?? DEFAULT_SETTINGS.hasAllowance,
+        pay_type: updated.payType || DEFAULT_SETTINGS.payType,
+        pay_schedule: updated.paySchedule || DEFAULT_SETTINGS.paySchedule,
+        updated_at: new Date().toISOString()
+      });
+  }
 }
