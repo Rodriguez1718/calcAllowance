@@ -182,3 +182,20 @@ export async function stopTimer(userId: string, description: string) {
 
   if (error) throw error;
 }
+
+export async function updateTimerStart(userId: string, startTimeStr: string) {
+  // startTimeStr is HH:mm
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+  const fullStart = new Date(`${dateStr}T${startTimeStr}:00`);
+  
+  const { error } = await supabase
+    .from('active_timers')
+    .update({
+      start_time: fullStart.toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .eq('user_id', userId);
+
+  if (error) throw error;
+}
