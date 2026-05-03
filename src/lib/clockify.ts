@@ -112,13 +112,18 @@ export async function getDailyDTR(clockifyUserId: string, year: number, month: n
     dtr[i] = { amIn: '', amOut: '', pmIn: '', pmOut: '', totalSeconds: 0 };
   }
 
+  // Sort entries by start time ascending
+  entries.sort((a: any, b: any) => 
+    new Date(a.timeInterval.start).getTime() - new Date(b.timeInterval.start).getTime()
+  );
+
   for (const entry of entries) {
     const start = new Date(entry.timeInterval.start);
     const end = new Date(entry.timeInterval.end);
     
-    // Get components in Manila time
     const day = parseInt(new Intl.DateTimeFormat('en-US', { day: 'numeric', timeZone: 'Asia/Manila' }).format(start));
-    const hour = parseInt(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: 'Asia/Manila' }).format(start));
+    const startHour = parseInt(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: 'Asia/Manila' }).format(start));
+    const endHour = parseInt(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: 'Asia/Manila' }).format(end));
     const duration = parseIsoDuration(entry.timeInterval.duration);
     
     const timeStr = (date: Date) => date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Manila' });
@@ -126,12 +131,15 @@ export async function getDailyDTR(clockifyUserId: string, year: number, month: n
     if (dtr[day]) {
       dtr[day].totalSeconds += duration;
 
-      // categorized by Manila hour
-      if (hour < 12) {
+      if (startHour < 12) {
+        // Morning Block: starts before 12 PM
         if (!dtr[day].amIn) dtr[day].amIn = timeStr(start);
+        // amOut is the latest end time of any session that started in the morning
         dtr[day].amOut = timeStr(end);
       } else {
+        // Afternoon Block: starts at or after 12 PM
         if (!dtr[day].pmIn) dtr[day].pmIn = timeStr(start);
+        // pmOut is the latest end time of any session that started in the afternoon
         dtr[day].pmOut = timeStr(end);
       }
     }
