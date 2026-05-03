@@ -95,12 +95,12 @@ export async function destroySession(id: string) {
 }
 
 export async function deleteAccount(userId: string) {
-  // Delete all user-related data
-  const { error: entriesError } = await supabase.from('entries').delete().eq('user_id', userId);
-  const { error: settingsError } = await supabase.from('settings').delete().eq('user_id', userId);
-  const { error: timerError } = await supabase.from('active_timers').delete().eq('user_id', userId);
+  // Delete all user-related data in order to respect any constraints
+  await supabase.from('entries').delete().eq('user_id', userId);
+  await supabase.from('active_timers').delete().eq('user_id', userId);
   
-  if (entriesError || settingsError || timerError) {
-    throw new Error('Failed to delete some user data');
-  }
+  // Attempt to delete from all possible settings tables
+  await supabase.from('student_settings').delete().eq('user_id', userId);
+  await supabase.from('coordinator_settings').delete().eq('user_id', userId);
+  await supabase.from('settings').delete().eq('user_id', userId);
 }

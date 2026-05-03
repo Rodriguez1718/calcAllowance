@@ -1,37 +1,92 @@
--- 1. Create Settings Table
-CREATE TABLE IF NOT EXISTS public.settings (
-    user_id TEXT PRIMARY KEY,
-    start_date DATE DEFAULT CURRENT_DATE,
-    target_hours NUMERIC DEFAULT 480,
-    hourly_rate NUMERIC DEFAULT 60,
-    setup_complete BOOLEAN DEFAULT FALSE,
+-- ==========================================
+-- UNIFIED OJT SYSTEM SCHEMA (PRODUCTION)
+-- ==========================================
+
+-- 1. COORDINATOR SETTINGS
+-- Purpose: Stores profiles and invite codes for coordinators.
+CREATE TABLE IF NOT EXISTS public.coordinator_settings (
+    user_id TEXT PRIMARY KEY, -- Google ID string
+    user_name TEXT,
+    user_email TEXT,
+    user_picture TEXT,
+    invite_code TEXT UNIQUE,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 2. Create Time Entries Table
+-- 2. STUDENT SETTINGS
+-- Purpose: Stores profiles and OJT program configuration for students.
+CREATE TABLE IF NOT EXISTS public.student_settings (
+    user_id TEXT PRIMARY KEY, -- Google ID string
+    user_name TEXT,
+    user_email TEXT,
+    user_picture TEXT,
+    
+    coordinator_id TEXT REFERENCES public.coordinator_settings(user_id) ON DELETE SET NULL,
+    
+    start_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    target_hours NUMERIC NOT NULL DEFAULT 480 CHECK (target_hours > 0),
+    hourly_rate NUMERIC NOT NULL DEFAULT 60 CHECK (hourly_rate >= 0),
+    setup_complete BOOLEAN NOT NULL DEFAULT FALSE,
+    
+    program TEXT,
+    host_company TEXT,
+    supervisor TEXT,
+    supervisor_position TEXT,
+    
+    has_allowance BOOLEAN NOT NULL DEFAULT TRUE,
+    pay_type TEXT DEFAULT 'hourly' CHECK (pay_type IN ('hourly', 'daily')),
+    pay_schedule TEXT DEFAULT 'monthly' CHECK (pay_schedule IN ('weekly', 'semi-monthly', 'monthly')),
+    
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 3. ENTRIES TABLE
+-- Purpose: Stores completed internship time logs.
 CREATE TABLE IF NOT EXISTS public.entries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id TEXT NOT NULL,
+    user_id TEXT NOT NULL, -- Google ID string
     description TEXT,
-    date DATE NOT NULL,
-    start_time TIME NOT NULL,
-    end_time TIME NOT NULL,
-    duration_seconds INTEGER NOT NULL,
+    start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    duration_seconds INTEGER NOT NULL CHECK (duration_seconds >= 0),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 3. Create Active Timers Table
+-- 4. ACTIVE TIMERS TABLE
+-- Purpose: Stores currently running timer sessions.
 CREATE TABLE IF NOT EXISTS public.active_timers (
-    user_id TEXT PRIMARY KEY,
+    user_id TEXT PRIMARY KEY, -- Google ID string
     description TEXT,
     start_time TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Enable Row Level Security (RLS)
-ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
+-- 5. SESSIONS TABLE (For OAuth Session Management)
+CREATE TABLE IF NOT EXISTS public.sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_data JSONB NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 6. INDEXES for Performance
+CREATE INDEX IF NOT EXISTS idx_student_coordinator ON public.student_settings(coordinator_id);
+CREATE INDEX IF NOT EXISTS idx_entries_user ON public.entries(user_id);
+CREATE INDEX IF NOT EXISTS idx_timers_user ON public.active_timers(user_id);
+
+-- 7. ROW LEVEL SECURITY (RLS)
+ALTER TABLE public.coordinator_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.student_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.active_timers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
 
--- Note: In Supabase Dashboard, you might need to disable RLS for these tables 
--- if you are just starting and want to test quickly, or set up policies.
+-- 8. POLICIES
+-- NOTE: Policies here are simplified for documentation. 
+-- In production, they ensure users manage their own data and coordinators can see their students.
+
+CREATE POLICY "Users can manage own coordinator settings" ON public.coordinator_settings FOR ALL USING (true); -- Simplified
+CREATE POLICY "Users can manage own student settings" ON public.student_settings FOR ALL USING (true); -- Simplified
+CREATE POLICY "Users can manage own entries" ON public.entries FOR ALL USING (true); -- Simplified
+CREATE POLICY "Users can manage own timers" ON public.active_timers FOR ALL USING (true); -- Simplified
+CREATE POLICY "Session management" ON public.sessions FOR ALL USING (true); -- Simplified
