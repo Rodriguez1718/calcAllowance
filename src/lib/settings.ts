@@ -5,6 +5,13 @@ export interface AppSettings {
   targetHours: number;
   hourlyRate: number;
   setupComplete: boolean;
+  program: string;
+  hostCompany: string;
+  supervisor: string;
+  supervisorPosition: string;
+  hasAllowance: boolean;
+  payType: 'hourly' | 'daily';
+  paySchedule: 'weekly' | 'semi-monthly' | 'monthly';
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -12,6 +19,13 @@ const DEFAULT_SETTINGS: AppSettings = {
   targetHours: 480,
   hourlyRate: 60,
   setupComplete: false,
+  program: 'Enter Program / Course',
+  hostCompany: 'Enter Host Company',
+  supervisor: 'Enter Supervisor Name',
+  supervisorPosition: 'Enter Position',
+  hasAllowance: true,
+  payType: 'hourly',
+  paySchedule: 'monthly',
 };
 
 export async function getAppSettings(userId: string): Promise<AppSettings> {
@@ -31,6 +45,13 @@ export async function getAppSettings(userId: string): Promise<AppSettings> {
       targetHours: Number(data.target_hours),
       hourlyRate: Number(data.hourly_rate),
       setupComplete: data.setup_complete,
+      program: data.program || DEFAULT_SETTINGS.program,
+      hostCompany: data.host_company || DEFAULT_SETTINGS.hostCompany,
+      supervisor: data.supervisor || DEFAULT_SETTINGS.supervisor,
+      supervisorPosition: data.supervisor_position || DEFAULT_SETTINGS.supervisorPosition,
+      hasAllowance: data.has_allowance ?? DEFAULT_SETTINGS.hasAllowance,
+      payType: data.pay_type || DEFAULT_SETTINGS.payType,
+      paySchedule: data.pay_schedule || DEFAULT_SETTINGS.paySchedule,
     };
   } catch (e) {
     return DEFAULT_SETTINGS;
@@ -49,6 +70,13 @@ export async function saveAppSettings(userId: string, settings: Partial<AppSetti
       target_hours: updated.targetHours,
       hourly_rate: updated.hourlyRate,
       setup_complete: updated.setupComplete,
+      program: updated.program,
+      host_company: updated.hostCompany,
+      supervisor: updated.supervisor,
+      supervisor_position: updated.supervisorPosition,
+      has_allowance: updated.hasAllowance,
+      pay_type: updated.payType,
+      pay_schedule: updated.paySchedule,
       updated_at: new Date().toISOString(),
     });
 

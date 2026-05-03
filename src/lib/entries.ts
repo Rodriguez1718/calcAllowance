@@ -135,12 +135,23 @@ export async function stopTimer(userId: string, description: string) {
   const now = new Date();
   const start = new Date(timer.startTime);
   
+  // Force Philippine Time (Asia/Manila)
+  const getPHT = (date: Date) => {
+    return {
+      date: date.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }), // YYYY-MM-DD
+      time: date.toLocaleTimeString('en-GB', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit' }) // HH:mm
+    };
+  };
+
+  const startPHT = getPHT(start);
+  const nowPHT = getPHT(now);
+  
   await addManualEntry({
     userId,
     description,
-    date: start.toISOString().split('T')[0],
-    startTime: start.toTimeString().substring(0, 5),
-    endTime: now.toTimeString().substring(0, 5)
+    date: startPHT.date,
+    startTime: startPHT.time,
+    endTime: nowPHT.time
   });
 
   const { error } = await supabase

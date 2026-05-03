@@ -52,16 +52,44 @@ if (isUsingManual) {
   const filtered = manualEntries.filter(e => new Date(e.date) >= new Date(settings.startDate));
   renderedHours = filtered.reduce((acc, e) => acc + e.durationSeconds, 0) / 3600;
   
-  // Group manual entries by month for the table
-  const monthlyMap: Record<string, number> = {};
-  filtered.forEach(e => {
-    const monthKey = e.date.substring(0, 7); // YYYY-MM
-    monthlyMap[monthKey] = (monthlyMap[monthKey] || 0) + e.durationSeconds;
-  });
-  monthlyData = Object.entries(monthlyMap).map(([month, seconds]) => ({
-    month,
-    hours: seconds / 3600
-  })).sort((a,b) => b.month.localeCompare(a.month));
+  // Dynamic grouping logic
+  const groupEntries = (entries: any[], schedule: string) => {
+    const map: Record<string, { label: string, seconds: number, days: Set<string> }> = {};
+    
+    entries.forEach(e => {
+      const d = new Date(e.date);
+      let key = '';
+      let label = '';
+      
+      if (schedule === 'weekly') {
+        const firstDayOfYear = new Date(d.getFullYear(), 0, 1);
+        const pastDaysOfYear = (d.getTime() - firstDayOfYear.getTime()) / 86400000;
+        const weekNum = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+        key = `${d.getFullYear()}-W${weekNum}`;
+        label = `Week ${weekNum}, ${d.getFullYear()}`;
+      } else if (schedule === 'semi-monthly') {
+        const isSecondHalf = d.getDate() > 15;
+        key = `${e.date.substring(0, 7)}-${isSecondHalf ? 'H2' : 'H1'}`;
+        label = `${d.toLocaleString('en-US', { month: 'long' })} ${isSecondHalf ? '16-31' : '1-15'}, ${d.getFullYear()}`;
+      } else {
+        key = e.date.substring(0, 7);
+        label = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+      }
+      
+      if (!map[key]) map[key] = { label, seconds: 0, days: new Set() };
+      map[key].seconds += e.durationSeconds;
+      map[key].days.add(e.date);
+    });
+    
+    return Object.values(map).sort((a, b) => b.label.localeCompare(a.label));
+  };
+
+  const grouped = groupEntries(isUsingManual ? filtered : activity.map(a => ({ date: a.startTime.split(' ')[0], durationSeconds: a.duration })), settings.paySchedule);
+  monthlyData = grouped.map(item => ({
+    label: item.label,
+    hours: item.seconds / 3600,
+    days: item.days.size
+  }));
 }
 
 // Compute countdown (using static target for now, or could add targetDate to settings)
@@ -122,7 +150,7 @@ if (!isUsingManual) {
               <p>Welcome! Let's set up your internship details to get your dashboard ready.</p>
             </div>
             
-            <form action="/api/settings" method="POST" class="setup-form">
+            <form action="/api/settings" method="POST" class="setup-form" id="setup-wizard">
               <input type="hidden" name="setupComplete" value="true" />
               <input type="hidden" name="redirect" value="/dashboard" />
               
@@ -133,12 +161,39 @@ if (!isUsingManual) {
                   <span class="input-unit">HRS</span>
                 </div>
               </div>
-              
+
               <div class="form-group">
-                <label>Hourly Allowance</label>
-                <div class="input-wrapper">
-                  <span class="input-prefix">₱</span>
-                  <input type="number" name="hourlyRate" value={settings.hourlyRate} required step="0.01" placeholder="e.g. 60.00" />
+                <label class="check-label">
+                  <input type="checkbox" name="hasAllowance" value="true" checked={settings.hasAllowance} id="allowance-toggle" />
+                  <span>This internship offers an allowance</span>
+                </label>
+              </div>
+              
+              <div id="allowance-fields" style={settings.hasAllowance ? "" : "display: none;"}>
+                <div class="form-row split">
+                  <div class="form-group">
+                    <label>Pay Model</label>
+                    <select name="payType" class="setup-select">
+                      <option value="hourly" selected={settings.payType === 'hourly'}>Hourly Rate</option>
+                      <option value="daily" selected={settings.payType === 'daily'}>Fixed Daily Rate</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Rate (₱)</label>
+                    <div class="input-wrapper">
+                      <span class="input-prefix">₱</span>
+                      <input type="number" name="hourlyRate" value={settings.hourlyRate} required step="0.01" placeholder="e.g. 60.00" />
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label>Pay Schedule</label>
+                  <select name="paySchedule" class="setup-select">
+                    <option value="weekly" selected={settings.paySchedule === 'weekly'}>Every Week</option>
+                    <option value="semi-monthly" selected={settings.paySchedule === 'semi-monthly'}>Every 15th / 30th (Semi-monthly)</option>
+                    <option value="monthly" selected={settings.paySchedule === 'monthly'}>Monthly</option>
+                  </select>
                 </div>
               </div>
               
@@ -149,11 +204,18 @@ if (!isUsingManual) {
               
               <button type="submit" class="btn-setup">Save & Initialize Dashboard</button>
             </form>
+
+            <script is:inline>
+              document.getElementById('allowance-toggle')?.addEventListener('change', (e) => {
+                const fields = document.getElementById('allowance-fields');
+                if (fields) fields.style.display = e.target.checked ? 'block' : 'none';
+              });
+            </script>
           </div>
         </div>
       )}
 
-      <div id="dash-content">
+      <div id="dash-content" class="content-center">
         <div class="dash-greeting">
           <h1>Welcome back, <span class="accent">{user.name?.split(' ')[0]}</span></h1>
           <p>Here's your progress overview for the current internship cycle.</p>
@@ -197,30 +259,35 @@ if (!isUsingManual) {
         </div>
 
         <div class="activity-section">
-          <h2 class="section-title">Monthly Breakdown</h2>
+          <h2 class="section-title">
+            Earnings Breakdown 
+            <span class="schedule-badge">{settings.paySchedule}</span>
+          </h2>
           <div class="table-wrapper">
             <table class="breakdown-table">
               <thead>
                 <tr>
-                  <th>Month</th>
-                  <th>Hours Rendered</th>
-                  <th>Total Estimate</th>
+                  <th>Period</th>
+                  <th>{settings.payType === 'hourly' ? 'Hours Rendered' : 'Days Attended'}</th>
+                  {settings.hasAllowance && <th>Total Estimate</th>}
                 </tr>
               </thead>
               <tbody>
                 {monthlyData.length > 0 ? (
                   monthlyData.map((item) => (
                     <tr>
-                      <td class="month-name">
-                        {new Date(item.month + '-02').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                      </td>
-                      <td class="mono">{item.hours.toFixed(2)} hrs</td>
-                      <td class="mono allowance-val">₱{(item.hours * settings.hourlyRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td class="month-name">{item.label}</td>
+                      <td class="mono">{settings.payType === 'hourly' ? `${item.hours.toFixed(2)} hrs` : `${item.days} days`}</td>
+                      {settings.hasAllowance && (
+                        <td class="mono allowance-val">
+                          ₱{(settings.payType === 'hourly' ? item.hours * settings.hourlyRate : item.days * settings.hourlyRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                      )}
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colspan="3" class="empty-state">No time entries found for the selected period.</td>
+                    <td colspan={settings.hasAllowance ? 3 : 2} class="empty-state">No time entries found for the selected period.</td>
                   </tr>
                 )}
               </tbody>
@@ -291,7 +358,8 @@ if (!isUsingManual) {
   .metric-value { font-size: 28px; font-weight: 700; color: var(--text-primary); letter-spacing: -.02em; line-height: 1; }
   .metric-unit { font-size: 13px; font-weight: 400; color: var(--text-secondary); }
   .metric-sub { font-size: 11px; color: var(--text-secondary); margin-top: 8px; }
-  .section-title { font-size: 15px; font-weight: 600; color: var(--ntv-orange); letter-spacing: .04em; margin-bottom: 16px; }
+  .section-title { display: flex; align-items: center; justify-content: space-between; font-size: 15px; font-weight: 600; color: var(--ntv-orange); letter-spacing: .04em; margin-bottom: 16px; }
+  .schedule-badge { font-size: 9px; padding: 2px 8px; background: rgba(237, 102, 33, 0.1); border: 1px solid rgba(237, 102, 33, 0.2); border-radius: 4px; text-transform: uppercase; color: var(--ntv-orange); }
   .activity-list { display: flex; flex-direction: column; gap: 0; }
   .activity-item { display: flex; align-items: center; gap: 14px; padding: 14px 18px; background: rgba(5, 11, 22, 0.6); border: 1px solid var(--border-subtle); border-bottom: none; transition: background .15s; }
   .activity-item:first-child { border-radius: 12px 12px 0 0; }
@@ -328,28 +396,39 @@ if (!isUsingManual) {
   
   /* MODAL STYLES */
   .setup-overlay { position: fixed; inset: 0; background: rgba(5, 11, 22, 0.85); backdrop-filter: blur(8px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
-  .setup-modal { background: #0d1421; border: 1px solid rgba(237, 102, 33, 0.3); border-radius: 20px; width: 100%; max-width: 440px; padding: 40px; box-shadow: 0 20px 80px rgba(0,0,0,0.6), 0 0 40px rgba(237, 102, 33, 0.1); animation: modalIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .setup-modal { background: #0d1421; border: 1px solid rgba(237, 102, 33, 0.3); border-radius: 20px; width: 100%; max-width: 440px; padding: 32px 36px; box-shadow: 0 20px 80px rgba(0,0,0,0.6), 0 0 40px rgba(237, 102, 33, 0.1); animation: modalIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
   @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
   
-  .modal-header { text-align: center; margin-bottom: 32px; }
-  .modal-badge { display: inline-block; padding: 4px 10px; background: rgba(237, 102, 33, 0.15); color: var(--ntv-orange); font-size: 10px; font-weight: 700; border-radius: 4px; letter-spacing: 0.1em; margin-bottom: 12px; }
-  .modal-header h2 { font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 8px; }
-  .modal-header p { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+  .modal-header { text-align: center; margin-bottom: 24px; }
+  .modal-badge { display: inline-block; padding: 3px 8px; background: rgba(237, 102, 33, 0.15); color: var(--ntv-orange); font-size: 9px; font-weight: 700; border-radius: 4px; letter-spacing: 0.1em; margin-bottom: 8px; }
+  .modal-header h2 { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+  .modal-header p { font-size: 12px; color: var(--text-secondary); line-height: 1.4; }
   
-  .setup-form { display: flex; flex-direction: column; gap: 20px; }
-  .form-group { display: flex; flex-direction: column; gap: 8px; }
-  .form-group label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+  .setup-form { display: flex; flex-direction: column; gap: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group label { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
   
   .input-wrapper { position: relative; display: flex; align-items: center; }
   .input-prefix, .input-unit { position: absolute; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
   .input-prefix { left: 14px; }
   .input-unit { right: 14px; color: var(--ntv-orange); }
   
-  .setup-form input { width: 100%; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 12px 14px; color: #fff; font-size: 15px; font-family: 'Outfit', sans-serif; transition: all 0.2s; }
+  .setup-form input { width: 100%; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 10px 14px; color: #fff; font-size: 14px; font-family: 'Outfit', sans-serif; transition: all 0.2s; }
   .setup-form input:focus { outline: none; border-color: var(--ntv-orange); background: rgba(237, 102, 33, 0.04); }
   .setup-form .input-prefix + input { padding-left: 32px; }
   .setup-form input[type="date"] { color-scheme: dark; }
   
+  .setup-form .form-row.split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .check-label { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px !important; color: var(--text-primary) !important; }
+  .check-label input { width: auto; cursor: pointer; }
+  .setup-select { 
+    width: 100%; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); 
+    border-radius: 10px; padding: 10px 14px; color: #fff; font-size: 13px; 
+    font-family: 'Outfit', sans-serif; outline: none; cursor: pointer;
+  }
+  .setup-select option { background: #0d1421; color: #fff; }
+  .setup-select:focus { border-color: var(--ntv-orange); }
+
   .btn-setup { margin-top: 10px; background: var(--ntv-gradient); border: none; border-radius: 10px; padding: 14px; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 15px rgba(237, 102, 33, 0.3); }
   .btn-setup:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(237, 102, 33, 0.4); filter: brightness(1.1); }
   .btn-setup:active { transform: translateY(0); }

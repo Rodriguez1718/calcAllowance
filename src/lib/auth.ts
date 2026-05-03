@@ -9,16 +9,21 @@ import { supabase } from './supabase';
 
 // ... SCOPES and other functions remain same ...
 
-export function getOAuth2Client() {
+export function getOAuth2Client(origin?: string) {
+  // Use the origin from the request if available, otherwise fallback to the environment variable
+  const redirectUri = origin 
+    ? new URL('/api/auth/callback', origin).toString()
+    : import.meta.env.GOOGLE_REDIRECT_URI;
+
   return new google.auth.OAuth2(
     import.meta.env.GOOGLE_CLIENT_ID,
     import.meta.env.GOOGLE_CLIENT_SECRET,
-    import.meta.env.GOOGLE_REDIRECT_URI
+    redirectUri
   );
 }
 
-export function getAuthUrl() {
-  const client = getOAuth2Client();
+export function getAuthUrl(origin?: string) {
+  const client = getOAuth2Client(origin);
   return client.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
@@ -26,21 +31,26 @@ export function getAuthUrl() {
   });
 }
 
-export async function getUserFromCode(code: string) {
-  const client = getOAuth2Client();
-  const { tokens } = await client.getToken(code);
-  client.setCredentials(tokens);
+export async function getUserFromCode(code: string, origin?: string) {
+  const client = getOAuth2Client(origin);
+  try {
+    const { tokens } = await client.getToken(code);
+    client.setCredentials(tokens);
 
-  const oauth2 = google.oauth2({ version: 'v2', auth: client });
-  const { data } = await oauth2.userinfo.get();
+    const oauth2 = google.oauth2({ version: 'v2', auth: client });
+    const { data } = await oauth2.userinfo.get();
 
-  return {
-    id: data.id,
-    email: data.email,
-    name: data.name,
-    picture: data.picture,
-    hd: data.hd,
-  };
+    return {
+      id: data.id,
+      email: data.email,
+      name: data.name,
+      picture: data.picture,
+      hd: data.hd,
+    };
+  } catch (error: any) {
+    console.error('Error fetching user from code:', error.response?.data || error.message);
+    throw error;
+  }
 }
 
 export async function createSession(user: any): Promise<string> {
@@ -82,4 +92,15 @@ export async function getSession(id: string) {
 
 export async function destroySession(id: string) {
   await supabase.from('sessions').delete().eq('id', id);
+}
+
+export async function deleteAccount(userId: string) {
+  // Delete all user-related data
+  const { error: entriesError } = await supabase.from('entries').delete().eq('user_id', userId);
+  const { error: settingsError } = await supabase.from('settings').delete().eq('user_id', userId);
+  const { error: timerError } = await supabase.from('active_timers').delete().eq('user_id', userId);
+  
+  if (entriesError || settingsError || timerError) {
+    throw new Error('Failed to delete some user data');
+  }
 }

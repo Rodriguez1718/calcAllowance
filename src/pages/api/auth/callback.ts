@@ -11,7 +11,7 @@ export const GET: APIRoute = async ({ request }) => {
   }
 
   try {
-    const user = await getUserFromCode(code);
+    const user = await getUserFromCode(code, url.origin);
     const sessionId = await createSession(user);
 
     const headers = new Headers();
@@ -22,8 +22,8 @@ export const GET: APIRoute = async ({ request }) => {
     );
 
     return new Response(null, { status: 302, headers });
-  } catch (err) {
-    console.error('OAuth callback error:', err);
+  } catch (err: any) {
+    console.error('OAuth callback error:', err.response?.data || err.message);
     return Response.redirect(new URL('/?error=auth_failed', url.origin).toString(), 302);
   }
 };

@@ -18,6 +18,13 @@ export const POST: APIRoute = async ({ request }) => {
     const startDate = formData.get('startDate') as string;
     const targetHours = parseFloat(formData.get('targetHours') as string);
     const hourlyRate = parseFloat(formData.get('hourlyRate') as string);
+    const program = formData.get('program') as string;
+    const hostCompany = formData.get('hostCompany') as string;
+    const supervisor = formData.get('supervisor') as string;
+    const supervisorPosition = formData.get('supervisorPosition') as string;
+    const hasAllowance = formData.get('hasAllowance') === 'true';
+    const payType = formData.get('payType') as 'hourly' | 'daily';
+    const paySchedule = formData.get('paySchedule') as 'weekly' | 'semi-monthly' | 'monthly';
     const setupComplete = formData.get('setupComplete') === 'true';
     const redirectUrl = formData.get('redirect') as string || '/settings';
 
@@ -25,7 +32,19 @@ export const POST: APIRoute = async ({ request }) => {
       return new Response('Invalid data', { status: 400 });
     }
 
-    await saveAppSettings(session.id, { startDate, targetHours, hourlyRate, setupComplete });
+    await saveAppSettings(session.id, { 
+      startDate, 
+      targetHours, 
+      hourlyRate, 
+      setupComplete,
+      program,
+      hostCompany,
+      supervisor,
+      supervisorPosition,
+      hasAllowance,
+      payType,
+      paySchedule
+    });
 
     const finalUrl = new URL(redirectUrl, request.url);
     if (redirectUrl === '/settings') finalUrl.searchParams.set('success', 'true');

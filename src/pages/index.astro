@@ -52,7 +52,7 @@ if (user) {
       <div class="bg-grid" aria-hidden="true"></div>
       <div class="bg-glow" aria-hidden="true"></div>
 
-      <div id="stage">
+      <div id="stage" class="content-center">
         <!-- TOP METRICS -->
         <div class="metrics-row">
           <div class="metric-card locked">
@@ -209,10 +209,17 @@ if (user) {
 
   @media (max-width: 900px) {
     #sidebar { display: none; }
-    #portal-main { margin-left: 0; padding: 16px; }
+    #portal-main { 
+      margin-left: 0; 
+      padding: 16px; 
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
     .header-center, .header-right { display: none; }
     #sys-header { justify-content: center; padding: 0 16px; }
-    .metrics-row { flex-direction: column; align-items: center; }
+    .metrics-row { flex-direction: column; align-items: center; width: 100%; }
     .metric-card { max-width: 100%; width: 100%; min-width: unset; }
   }
 

@@ -96,7 +96,12 @@ const formatDuration = (seconds: number) => {
   return `${h}:${m.toString().padStart(2, '0')}`;
 };
 
-const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long' }).toUpperCase();
+const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long', timeZone: 'Asia/Manila' }).toUpperCase();
+
+const needsUpdate = 
+  settings.program.includes('Enter') || 
+  settings.hostCompany.includes('Enter') || 
+  settings.supervisor.includes('Enter');
 ---
 <Layout>
   <Header user={user} />
@@ -105,6 +110,16 @@ const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month:
     <Sidebar user={user} activeTab="dtr" />
 
     <main id="portal-main">
+      {needsUpdate && (
+        <div class="no-print settings-alert">
+          <div class="alert-content">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01"/></svg>
+            <span>Your DTR details are not updated yet. Please update them in the settings.</span>
+          </div>
+          <a href="/settings" class="alert-link">Go to Settings</a>
+        </div>
+      )}
+
       <div class="no-print actions-bar">
         <div class="month-selector">
           <form method="GET" class="selector-form">
@@ -126,7 +141,7 @@ const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month:
         </button>
       </div>
 
-      <div class="dtr-scroll-wrapper">
+      <div class="dtr-scroll-wrapper content-center">
         <div class="dtr-container" id="dtr-sheet">
           <header class="dtr-header">
             <div class="dtr-title">OJT DAILY TIME RECORD</div>
@@ -138,11 +153,11 @@ const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month:
               </div>
               <div class="info-item">
                 <span class="label">Program:</span>
-                <span class="value underline">BS Information Technology</span>
+                <span class="value underline">{settings.program}</span>
               </div>
               <div class="info-item">
                 <span class="label">Host Company:</span>
-                <span class="value underline">N-Compass TV</span>
+                <span class="value underline">{settings.hostCompany}</span>
               </div>
               <div class="info-item">
                 <span class="label">Period:</span>
@@ -150,7 +165,7 @@ const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month:
               </div>
               <div class="info-item">
                 <span class="label">Supervisor:</span>
-                <span class="value underline">Ms. Jessica Cordero</span>
+                <span class="value underline">{settings.supervisor}</span>
               </div>
               <div class="info-item highlight">
                 <span class="label">Total Hours:</span>
@@ -217,7 +232,7 @@ const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month:
               </div>
               <div class="sig-group">
                 <span class="sig-label">Position:</span>
-                <span class="value">Project Manager</span>
+                <span class="value">{settings.supervisorPosition}</span>
               </div>
             </div>
           </footer>
@@ -230,6 +245,19 @@ const monthName = new Date(year, month - 1).toLocaleDateString('en-US', { month:
 <style>
   #portal-body { display: flex; min-height: 100vh; padding-top: 56px; }
   #portal-main { margin-left: 220px; flex: 1; padding: 40px; position: relative; }
+  
+  .settings-alert {
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3);
+    border-radius: 10px; padding: 12px 20px; margin-bottom: 24px;
+    max-width: 800px; margin-left: auto; margin-right: auto;
+  }
+  .alert-content { display: flex; align-items: center; gap: 12px; color: #fbbf24; font-size: 14px; font-weight: 500; }
+  .alert-link { 
+    color: #fbbf24; text-decoration: underline; font-size: 13px; font-weight: 700; 
+    transition: all 0.2s; 
+  }
+  .alert-link:hover { color: white; }
 
   @media (max-width: 900px) {
     #portal-main { margin-left: 0; padding: 24px 16px; }
