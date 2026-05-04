@@ -31,10 +31,12 @@ const renderedHours = await getStudentProgress(user.id, user.email, settings.sta
 // Fetch detailed entry breakdown for the chart/list
 let allRawEntries: { date: string, durationSeconds: number }[] = [];
 try {
-  const clockifyUser = await getClockifyUser(user.email);
-  if (clockifyUser) {
-    const clockifyData = await getRenderedHours(clockifyUser.id, settings.startDate);
-    allRawEntries = [...clockifyData.entries];
+  if (settings.clockifyEnabled !== false) {
+    const clockifyUser = await getClockifyUser(user.email);
+    if (clockifyUser) {
+      const clockifyData = await getRenderedHours(clockifyUser.id, settings.startDate);
+      allRawEntries = [...clockifyData.entries];
+    }
   }
 } catch (e) {}
 
@@ -362,6 +364,22 @@ const finishDateStr = estimatedFinishDate.toLocaleDateString('en-US', {
     </main>
   </div>
 </Layout>
+
+<script is:inline>
+  const params = new URLSearchParams(window.location.search);
+  const successVal = params.get('success');
+  if (successVal) {
+    const msg = successVal === 'true' ? 'Dashboard updated' : successVal;
+    window.showToast(msg, 'success');
+    const newUrl = window.location.pathname;
+    window.history.replaceState({}, '', newUrl);
+  }
+  if (params.get('error')) {
+    window.showToast(decodeURIComponent(params.get('error')), 'error');
+    const newUrl = window.location.pathname;
+    window.history.replaceState({}, '', newUrl);
+  }
+</script>
 
 <style>
   #portal-body { display: flex; min-height: 100vh; padding-top: 56px; }

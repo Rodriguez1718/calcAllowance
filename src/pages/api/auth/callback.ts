@@ -14,6 +14,10 @@ export const GET: APIRoute = async ({ request }) => {
     const user = await getUserFromCode(code, url.origin);
     const sessionId = await createSession(user);
 
+    // Record login in sync logs
+    const { addSyncLog } = await import('../../../lib/logs');
+    await addSyncLog({ userId: user.id, type: 'Auth', status: 'Success', details: 'Google Session Established' });
+
     const headers = new Headers();
     headers.set('Location', '/dashboard');
     headers.set(

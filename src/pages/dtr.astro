@@ -63,7 +63,7 @@ const manualFiltered = manual.filter((e) => {
 });
 
 let clockifyId = "";
-if (isClockifySet) {
+if (isClockifySet && settings.clockifyEnabled !== false) {
   try {
     const clockifyUser = await getClockifyUser(settings.userEmail || "");
     if (clockifyUser) clockifyId = clockifyUser.id;
@@ -304,6 +304,20 @@ const needsUpdate =
   sSel?.addEventListener("change", update);
   mSel?.addEventListener("change", update);
   ySel?.addEventListener("change", update);
+
+  const params = new URLSearchParams(window.location.search);
+  const successVal = params.get('success');
+  if (successVal) {
+    const msg = successVal === 'true' ? 'DTR updated successfully' : successVal;
+    window.showToast(msg, 'success');
+    const newUrl = window.location.pathname;
+    window.history.replaceState({}, '', newUrl);
+  }
+  if (params.get('error')) {
+    window.showToast(decodeURIComponent(params.get('error')), 'error');
+    const newUrl = window.location.pathname;
+    window.history.replaceState({}, '', newUrl);
+  }
 </script>
 
 <style>

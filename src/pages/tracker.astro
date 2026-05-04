@@ -19,13 +19,15 @@ const settings = await getAppSettings(user.id);
 if (settings.role === 'coordinator') return Astro.redirect('/coordinator');
 
 let userInClockify = false;
-try {
-  if (import.meta.env.CLOCKIFY_API_KEY) {
-    const clockifyUser = await getClockifyUser(user.email);
-    userInClockify = !!clockifyUser;
+if (settings.clockifyEnabled !== false) {
+  try {
+    if (import.meta.env.CLOCKIFY_API_KEY) {
+      const clockifyUser = await getClockifyUser(user.email);
+      userInClockify = !!clockifyUser;
+    }
+  } catch (e) {
+    userInClockify = false;
   }
-} catch (e) {
-  userInClockify = false;
 }
 
 if (Astro.request.method === 'POST') {
@@ -35,20 +37,22 @@ if (Astro.request.method === 'POST') {
   if (action === 'start-timer' && !userInClockify) {
     const desc = formData.get('description') as string;
     await startTimer(user.id, desc);
-    return Astro.redirect('/tracker');
+    return Astro.redirect('/tracker?success=Timer started');
   }
 
   if (action === 'update-start' && !userInClockify) {
     const newStart = formData.get('startTime') as string;
     await updateTimerStart(user.id, newStart);
-    return Astro.redirect('/tracker');
+    return Astro.redirect('/tracker?success=Start time updated');
   }
 
   if (action === 'stop-timer' && !userInClockify) {
     const desc = formData.get('description') as string;
     try {
       await stopTimer(user.id, desc);
-      return Astro.redirect('/tracker?success=true');
+      const { addSyncLog } = await import('../lib/logs');
+      await addSyncLog({ userId: user.id, type: 'Sync', status: 'Success', details: `Timer stopped: ${desc || 'No description'}` });
+      return Astro.redirect('/tracker?success=Activity log saved');
     } catch (e) {
       return Astro.redirect(`/tracker?error=${encodeURIComponent(e.message)}`);
     }
@@ -61,7 +65,9 @@ if (Astro.request.method === 'POST') {
     const endTime = formData.get('endTime') as string;
     try {
       await addManualEntry({ userId: user.id, description, date, startTime, endTime });
-      return Astro.redirect('/tracker?success=true');
+      const { addSyncLog } = await import('../lib/logs');
+      await addSyncLog({ userId: user.id, type: 'Mode', status: 'Success', details: `Manual entry added: ${description || 'No description'}` });
+      return Astro.redirect('/tracker?success=Manual entry added');
     } catch (e) {
       return Astro.redirect(`/tracker?error=${encodeURIComponent(e.message)}`);
     }
@@ -75,7 +81,9 @@ if (Astro.request.method === 'POST') {
     const endTime = formData.get('endTime') as string;
     try {
       await updateManualEntry(id, { description, date, startTime, endTime });
-      return Astro.redirect('/tracker?success=true');
+      const { addSyncLog } = await import('../lib/logs');
+      await addSyncLog({ userId: user.id, type: 'Mode', status: 'Success', details: `Entry updated: ${description || 'No description'}` });
+      return Astro.redirect('/tracker?success=Activity log updated');
     } catch (e) {
       return Astro.redirect(`/tracker?error=${encodeURIComponent(e.message)}`);
     }
@@ -84,7 +92,9 @@ if (Astro.request.method === 'POST') {
   if (action === 'delete') {
     const id = formData.get('id') as string;
     await deleteManualEntry(id);
-    return Astro.redirect('/tracker');
+    const { addSyncLog } = await import('../lib/logs');
+    await addSyncLog({ userId: user.id, type: 'Mode', status: 'Warning', details: 'Manual entry deleted' });
+    return Astro.redirect('/tracker?success=Activity log deleted');
   }
 }
 
@@ -135,6 +145,16 @@ const formatTo12hr = (timeStr: string) => {
           </div>
         ) : (
           <div class="tracker-layout">
+            {settings.clockifyEnabled === false && (
+              <div class="manual-mode-notice">
+                <div class="notice-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                </div>
+                <div class="notice-text">
+                  <strong>Manual Mode Active:</strong> Clockify integration is currently disabled. You are tracking time directly in this system. <a href="/settings" class="notice-link">Manage Integration</a>
+                </div>
+              </div>
+            )}
             
             <!-- Main Timer Section -->
             <section class={`main-control ${activeTimer ? 'timer-active' : ''}`} data-start={activeTimer?.startTime}>
@@ -316,8 +336,18 @@ const formatTo12hr = (timeStr: string) => {
 
 <script is:inline>
   const params = new URLSearchParams(window.location.search);
-  if (params.get('success')) window.showToast('Data updated');
-  if (params.get('error')) window.showToast(decodeURIComponent(params.get('error')), 'error');
+  const successVal = params.get('success');
+  if (successVal) {
+    const msg = successVal === 'true' ? 'Activity updated successfully' : successVal;
+    window.showToast(msg, 'success');
+    const newUrl = window.location.pathname;
+    window.history.replaceState({}, '', newUrl);
+  }
+  if (params.get('error')) {
+    window.showToast(decodeURIComponent(params.get('error')), 'error');
+    const newUrl = window.location.pathname;
+    window.history.replaceState({}, '', newUrl);
+  }
 
   const timerSection = document.querySelector('.main-control');
   const timerVal = document.getElementById('live-timer-val');
@@ -517,5 +547,45 @@ const formatTo12hr = (timeStr: string) => {
   @media (max-width: 600px) {
     .sync-status-card { flex-direction: column; gap: 24px; padding: 24px; text-align: center; align-items: center; }
     .sync-meta { justify-content: center; }
+  }
+
+  .manual-mode-notice {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: rgba(96, 165, 250, 0.08);
+    border: 1px solid rgba(96, 165, 250, 0.2);
+    border-radius: 12px;
+    padding: 14px 20px;
+    margin-bottom: 32px;
+    animation: fadeIn .4s ease-out;
+  }
+  .notice-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: rgba(96, 165, 250, 0.1);
+    color: #60a5fa;
+    border-radius: 10px;
+  }
+  .notice-text {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+  .notice-text strong {
+    color: #fff;
+    margin-right: 4px;
+  }
+  .notice-link {
+    color: #60a5fa;
+    text-decoration: underline;
+    font-weight: 600;
+    margin-left: 4px;
+  }
+  .notice-link:hover {
+    color: #fff;
   }
 </style>

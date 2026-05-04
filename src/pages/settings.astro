@@ -158,7 +158,7 @@ const isLinked = settings.role === 'student' && !!settings.coordinatorId;
                       </div>
                       <p class="hint">Your coordinator can now view your progress and DTR logs.</p>
                       
-                      <button type="submit" class="unlink-btn mt-16">
+                      <button type="button" id="open-coordinator-unlink-modal" class="unlink-btn mt-16">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
                         Unlink from Coordinator
                       </button>
@@ -227,19 +227,37 @@ const isLinked = settings.role === 'student' && !!settings.coordinatorId;
             <section class="settings-card">
               <h2 class="card-title">Clockify Integration</h2>
               <div class="integration-status">
-                <div class={`status-badge ${isClockifySet ? 'connected' : 'disconnected'}`}>
-                  {isClockifySet ? 'Connected' : 'Missing Credentials'}
+                <div class={`status-badge ${isClockifySet && settings.clockifyEnabled ? 'connected' : 'disconnected'}`}>
+                  {isClockifySet && settings.clockifyEnabled ? 'Connected' : (settings.clockifyEnabled ? 'Missing Credentials' : 'Disabled / Unlinked')}
                 </div>
                 <p class="status-desc">
-                  {isClockifySet 
+                  {isClockifySet && settings.clockifyEnabled
                     ? 'Your system is currently syncing with Clockify using the environment variables provided.' 
-                    : 'Update your .env file with CLOCKIFY_API_KEY and CLOCKIFY_WORKSPACE_ID to enable syncing.'}
+                    : (settings.clockifyEnabled 
+                        ? 'Update your .env file with CLOCKIFY_API_KEY and CLOCKIFY_WORKSPACE_ID to enable syncing.'
+                        : 'Clockify integration is disabled. Your records will be based on manual logs.')}
                 </p>
               </div>
-              <div class="config-help">
+              
+              {isClockifySet && settings.clockifyEnabled ? (
+                <button type="button" id="open-clockify-modal" class="unlink-btn">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+                  Unlink Clockify
+                </button>
+              ) : (
+                isClockifySet && (
+                  <form action="/api/settings" method="POST">
+                    <input type="hidden" name="linkClockify" value="true" />
+                    <input type="hidden" name="redirect" value="/settings" />
+                    <button type="submit" class="save-btn">Re-link Clockify</button>
+                  </form>
+                )
+              )}
+
+              <div class="config-help mt-16">
                 <div class="help-item">
-                  <span class="help-label">Sync Frequency</span>
-                  <span class="help-value">Real-time (On Request)</span>
+                  <span class="help-label">Sync Status</span>
+                  <span class="help-value">{settings.clockifyEnabled ? 'Active' : 'Paused'}</span>
                 </div>
                 <div class="help-item">
                   <span class="help-label">Target Hours</span>
@@ -271,6 +289,48 @@ const isLinked = settings.role === 'student' && !!settings.coordinatorId;
         </div>
       </div>
       
+      <!-- CLOCKIFY UNLINK MODAL -->
+      <div id="clockify-modal" class="modal-overlay">
+        <div class="modal-content">
+          <div class="modal-header-danger">
+            <div class="warning-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01"/></svg>
+            </div>
+            <h2>Unlink Clockify?</h2>
+          </div>
+          <p class="modal-desc">Are you sure you want to disconnect Clockify? Future logs will rely entirely on manual entries. Your existing synced logs will remain visible but will no longer update from Clockify.</p>
+          <div class="modal-actions">
+            <form action="/api/settings" method="POST">
+              <input type="hidden" name="unlinkClockify" value="true" />
+              <input type="hidden" name="redirect" value="/settings" />
+              <button type="submit" class="btn-confirm-delete">Yes, Unlink Now</button>
+            </form>
+            <button type="button" id="close-clockify-modal" class="btn-cancel">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- COORDINATOR UNLINK MODAL -->
+      <div id="coordinator-unlink-modal" class="modal-overlay">
+        <div class="modal-content">
+          <div class="modal-header-danger">
+            <div class="warning-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01"/></svg>
+            </div>
+            <h2>Unlink Coordinator?</h2>
+          </div>
+          <p class="modal-desc">Are you sure you want to unlink from **{coordinatorName}**? They will no longer be able to view your progress or verify your logs.</p>
+          <div class="modal-actions">
+            <form action="/api/settings" method="POST">
+              <input type="hidden" name="unlink" value="true" />
+              <input type="hidden" name="redirect" value="/settings" />
+              <button type="submit" class="btn-confirm-delete">Yes, Unlink Now</button>
+            </form>
+            <button type="button" id="close-coordinator-unlink-modal" class="btn-cancel">Cancel</button>
+          </div>
+        </div>
+      </div>
+
       <!-- DELETE MODAL -->
       <div id="delete-modal" class="modal-overlay">
         <div class="modal-content">
@@ -317,6 +377,46 @@ const isLinked = settings.role === 'student' && !!settings.coordinatorId;
     if (e.target === deleteModal) closeModal();
   });
 
+  // Clockify Unlink Modal
+  const clockifyModal = document.getElementById('clockify-modal');
+  const openClockifyBtn = document.getElementById('open-clockify-modal');
+  const closeClockifyBtn = document.getElementById('close-clockify-modal');
+
+  openClockifyBtn?.addEventListener('click', () => {
+    clockifyModal?.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  });
+
+  const closeClockify = () => {
+    clockifyModal?.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  closeClockifyBtn?.addEventListener('click', closeClockify);
+  clockifyModal?.addEventListener('click', (e) => {
+    if (e.target === clockifyModal) closeClockify();
+  });
+
+  // Coordinator Unlink Modal
+  const coordModal = document.getElementById('coordinator-unlink-modal');
+  const openCoordBtn = document.getElementById('open-coordinator-unlink-modal');
+  const closeCoordBtn = document.getElementById('close-coordinator-unlink-modal');
+
+  openCoordBtn?.addEventListener('click', () => {
+    coordModal?.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  });
+
+  const closeCoord = () => {
+    coordModal?.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  closeCoordBtn?.addEventListener('click', closeCoord);
+  coordModal?.addEventListener('click', (e) => {
+    if (e.target === coordModal) closeCoord();
+  });
+
   // Link settings logout button to the shared modal in Header
   document.getElementById('settings-logout-btn')?.addEventListener('click', () => {
     const logoutModal = document.getElementById('logout-modal');
@@ -328,8 +428,10 @@ const isLinked = settings.role === 'student' && !!settings.coordinatorId;
 
   // Check for success or error in URL
   const params = new URLSearchParams(window.location.search);
-  if (params.get('success') === 'true') {
-    window.showToast('Settings updated successfully!', 'success');
+  const successVal = params.get('success');
+  if (successVal) {
+    const msg = successVal === 'true' ? 'Settings updated successfully!' : successVal;
+    window.showToast(msg, 'success');
     const newUrl = window.location.pathname;
     window.history.replaceState({}, '', newUrl);
   }

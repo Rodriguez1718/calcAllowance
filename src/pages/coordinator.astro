@@ -181,6 +181,22 @@ const totalRenderedHours = studentStats.reduce((acc, s) => acc + s.renderedHours
   </div>
 </Layout>
 
+<script is:inline>
+  const params = new URLSearchParams(window.location.search);
+  const successVal = params.get('success');
+  if (successVal) {
+    const msg = successVal === 'true' ? 'Coordinator view updated' : successVal;
+    window.showToast(msg, 'success');
+    const newUrl = window.location.pathname;
+    window.history.replaceState({}, '', newUrl);
+  }
+  if (params.get('error')) {
+    window.showToast(decodeURIComponent(params.get('error')), 'error');
+    const newUrl = window.location.pathname;
+    window.history.replaceState({}, '', newUrl);
+  }
+</script>
+
 <style>
   #portal-body { display: flex; min-height: 100vh; padding-top: 56px; }
   #portal-main { margin-left: 220px; flex: 1; padding: 40px; position: relative; }

@@ -18,6 +18,7 @@ export interface AppSettings {
   userName?: string;
   userEmail?: string;
   userPicture?: string;
+  clockifyEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -32,7 +33,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   hasAllowance: true,
   payType: 'hourly',
   paySchedule: 'monthly',
-  role: 'student'
+  role: 'student',
+  clockifyEnabled: true
 };
 
 export async function getAppSettings(userId: string): Promise<AppSettings> {
@@ -79,7 +81,8 @@ export async function getAppSettings(userId: string): Promise<AppSettings> {
       coordinatorId: studentData.coordinator_id,
       userName: studentData.user_name,
       userEmail: studentData.user_email,
-      userPicture: studentData.user_picture
+      userPicture: studentData.user_picture,
+      clockifyEnabled: studentData.clockify_enabled ?? true
     };
   }
 
@@ -124,6 +127,7 @@ export async function saveAppSettings(userId: string, updated: Partial<AppSettin
         has_allowance: updated.hasAllowance ?? DEFAULT_SETTINGS.hasAllowance,
         pay_type: updated.payType || DEFAULT_SETTINGS.payType,
         pay_schedule: updated.paySchedule || DEFAULT_SETTINGS.paySchedule,
+        clockify_enabled: updated.clockifyEnabled ?? existingSettings.clockifyEnabled ?? DEFAULT_SETTINGS.clockifyEnabled,
         updated_at: new Date().toISOString()
       });
   }

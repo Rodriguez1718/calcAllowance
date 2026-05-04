@@ -53,16 +53,18 @@ export async function getRenderedHours(clockifyUserId: string, startDate?: strin
 }
 
 export async function getStudentProgress(userId: string, email: string, startDate?: string) {
-  const { data: settings } = await supabase.from('student_settings').select('rendered_hours').eq('user_id', userId).single();
+  const { data: settings } = await supabase.from('student_settings').select('rendered_hours, clockify_enabled').eq('user_id', userId).single();
   let manualHours = settings?.rendered_hours || 0;
   let clockifyHours = 0;
-  try {
-    const clockifyUser = await getClockifyUser(email);
-    if (clockifyUser) {
-      const data = await getRenderedHours(clockifyUser.id, startDate);
-      clockifyHours = data.totalHours;
-    }
-  } catch (e) {}
+  if (settings?.clockify_enabled !== false) {
+    try {
+      const clockifyUser = await getClockifyUser(email);
+      if (clockifyUser) {
+        const data = await getRenderedHours(clockifyUser.id, startDate);
+        clockifyHours = data.totalHours;
+      }
+    } catch (e) {}
+  }
   return Number(manualHours) + clockifyHours;
 }
 
@@ -146,18 +148,23 @@ export async function getDailyDTR(clockifyUserId: string, month: number, year: n
     } else {
       let lunchBreakIndex = -1;
       let maxGap = 0;
-      
-      for (let i = 0; i < dayLogs.length - 1; i++) {
-        const end = dayLogs[i].end.getTime();
-        const nextStart = dayLogs[i + 1].start.getTime();
-        const gap = nextStart - end;
-        const endH = parseInt(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: 'Asia/Manila' }).format(dayLogs[i].end));
-        
-        if (gap > 20 * 60 * 1000 && endH >= 11 && endH <= 14) {
-           if (gap > maxGap) {
-             maxGap = gap;
-             lunchBreakIndex = i;
-           }
+      if (dayLogs.length > 1) {
+        for (let i = 0; i < dayLogs.length - 1; i++) {
+          const end = dayLogs[i].end.getTime();
+          const nextStart = dayLogs[i + 1].start.getTime();
+          const gap = nextStart - end;
+          
+          if (gap < 60 * 1000) continue; // Skip overlaps or tiny gaps (< 1 min)
+
+          const endH = parseInt(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: 'Asia/Manila' }).format(dayLogs[i].end));
+          
+          // Any gap starting between 10 AM and 3 PM is a candidate for lunch break
+          if (endH >= 10 && endH <= 15) {
+             if (gap >= maxGap) {
+               maxGap = gap;
+               lunchBreakIndex = i;
+             }
+          }
         }
       }
 
@@ -168,7 +175,14 @@ export async function getDailyDTR(clockifyUserId: string, month: number, year: n
         dtr[d].pmOut = format12(dayLogs[dayLogs.length - 1].end);
       } else {
         dtr[d].amIn = format12(dayLogs[0].start);
-        dtr[d].amOut = format12(dayLogs[dayLogs.length - 1].end);
+        const lastEnd = dayLogs[dayLogs.length - 1].end;
+        const lastEndH = parseInt(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: 'Asia/Manila' }).format(lastEnd));
+        
+        if (lastEndH >= 13) {
+          dtr[d].pmOut = format12(lastEnd);
+        } else {
+          dtr[d].amOut = format12(lastEnd);
+        }
       }
     }
   }

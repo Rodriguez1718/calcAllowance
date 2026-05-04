@@ -30,8 +30,8 @@
 <style is:global>
   #toast-container {
     position: fixed;
-    bottom: 24px;
-    right: 24px;
+    bottom: 32px;
+    right: 32px;
     z-index: 9999;
     display: flex;
     flex-direction: column-reverse;
@@ -41,7 +41,7 @@
 
   .toast {
     pointer-events: auto;
-    min-width: 300px;
+    min-width: 320px;
     max-width: 420px;
     padding: 14px 20px;
     background: rgba(13, 14, 26, 0.9);
@@ -104,6 +104,7 @@
       bottom: 16px;
       right: 16px;
       left: 16px;
+      transform: none;
     }
     .toast {
       min-width: unset;

@@ -119,6 +119,21 @@ if (user) {
   const days = Math.max(0, Math.ceil((target.getTime() - Date.now()) / 86400000));
   const cv = document.getElementById('countdown-val');
   if (cv) cv.textContent = days + ' days';
+
+  // Toasts
+  const params = new URLSearchParams(window.location.search);
+  const successVal = params.get('success');
+  if (successVal) {
+    const msg = successVal === 'true' ? 'Welcome!' : successVal;
+    window.showToast(msg, 'success');
+    const newUrl = window.location.pathname;
+    window.history.replaceState({}, '', newUrl);
+  }
+  if (params.get('error')) {
+    window.showToast(decodeURIComponent(params.get('error')), 'error');
+    const newUrl = window.location.pathname;
+    window.history.replaceState({}, '', newUrl);
+  }
 </script>
 
 <style>
