@@ -4,6 +4,7 @@ import Header from '../components/Header.astro';
 import Sidebar from '../components/Sidebar.astro';
 import { getSession } from '../lib/auth';
 import { parse } from 'cookie';
+import { supabase } from '../lib/supabase';
 
 const cookieHeader = Astro.request.headers.get('cookie') || '';
 const cookies = parse(cookieHeader);
@@ -25,18 +26,14 @@ try {
   userInClockify = false;
 }
 
-const syncLogs = [
-  { 
-    id: 1, 
-    type: userInClockify ? 'Sync' : 'Mode', 
-    status: 'Success', 
-    date: new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }), 
-    duration: '0.1s', 
-    details: userInClockify ? 'Connected to Clockify Workspace' : 'Manual Time Tracking Active' 
-  },
-  { id: 2, type: 'Auth', status: 'Success', date: 'System', duration: '0.8s', details: 'Google OAuth session established' },
-];
+const { data: syncLogs } = await supabase
+  .from('sync_logs')
+  .select('*')
+  .eq('user_id', user.id)
+  .order('created_at', { ascending: false })
+  .limit(50);
 ---
+
 <Layout>
   <Header user={user} />
 
@@ -65,15 +62,19 @@ const syncLogs = [
               </tr>
             </thead>
             <tbody>
-              {syncLogs.map(log => (
+              {syncLogs && syncLogs.length > 0 ? syncLogs.map(log => (
                 <tr>
                   <td><span class={`type-pill ${log.type.toLowerCase()}`}>{log.type}</span></td>
                   <td><span class={`status-pill ${log.status.toLowerCase()}`}>{log.status}</span></td>
-                  <td class="mono">{log.date}</td>
+                  <td class="mono">{new Date(log.created_at).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}</td>
                   <td class="mono">{log.duration}</td>
                   <td class="details">{log.details}</td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td colspan="5" class="empty-state">No synchronization events recorded yet.</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -81,6 +82,22 @@ const syncLogs = [
     </main>
   </div>
 </Layout>
+
+<script is:inline>
+  const params = new URLSearchParams(window.location.search);
+  const successVal = params.get('success');
+  if (successVal) {
+    const msg = successVal === 'true' ? 'Logs synced successfully' : successVal;
+    window.showToast(msg, 'success');
+    const newUrl = window.location.pathname;
+    window.history.replaceState({}, '', newUrl);
+  }
+  if (params.get('error')) {
+    window.showToast(decodeURIComponent(params.get('error')), 'error');
+    const newUrl = window.location.pathname;
+    window.history.replaceState({}, '', newUrl);
+  }
+</script>
 
 <style>
   #portal-body { display: flex; min-height: 100vh; padding-top: 56px; }
@@ -124,4 +141,5 @@ const syncLogs = [
   
   .status-pill.success { background: rgba(52,211,153,.1); color: #34d399; border: 1px solid rgba(52,211,153,.2); }
   .status-pill.warning { background: rgba(251,191,36,.1); color: #fbbf24; border: 1px solid rgba(251,191,36,.2); }
+  .empty-state { text-align: center; padding: 40px !important; color: var(--text-secondary); font-style: italic; }
 </style>

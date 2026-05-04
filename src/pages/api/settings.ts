@@ -13,6 +13,7 @@ export const POST: APIRoute = async ({ request }) => {
     return new Response('Unauthorized', { status: 401 });
   }
 
+  let redirectUrl = '/dashboard';
   try {
     const formData = await request.formData();
     const role = formData.get('role') as 'student' | 'coordinator' || 'student';
@@ -25,7 +26,7 @@ export const POST: APIRoute = async ({ request }) => {
     
     // Extract common fields
     const setupComplete = formData.get('setupComplete') === 'true';
-    const redirectUrl = formData.get('redirect') as string || '/dashboard';
+    redirectUrl = formData.get('redirect') as string || '/dashboard';
     
     // Extract OJT fields with fallbacks to existing settings
     const startDate = formData.get('startDate') as string || existingSettings.startDate;
@@ -65,7 +66,11 @@ export const POST: APIRoute = async ({ request }) => {
         .eq('invite_code', coordinatorInvite.toUpperCase().trim())
         .single();
       
-      if (coord) coordinatorId = coord.user_id;
+      if (coord) {
+        coordinatorId = coord.user_id;
+      } else {
+        throw new Error('Invalid invite code. Please check with your coordinator.');
+      }
     }
 
     // Only validate OJT fields if user is a student and it's a full setup/update
@@ -73,6 +78,13 @@ export const POST: APIRoute = async ({ request }) => {
       if (!startDate || isNaN(targetHours) || isNaN(hourlyRate)) {
         throw new Error('Invalid data for student profile. Please ensure all required fields are filled.');
       }
+    }
+
+    let clockifyEnabled = existingSettings.clockifyEnabled;
+    if (formData.get('unlinkClockify') === 'true') {
+      clockifyEnabled = false;
+    } else if (formData.get('linkClockify') === 'true') {
+      clockifyEnabled = true;
     }
 
     await saveAppSettings(session.id, { 
@@ -90,27 +102,39 @@ export const POST: APIRoute = async ({ request }) => {
       role,
       inviteCode: role === 'coordinator' ? ((inviteCode || existingSettings.inviteCode)?.toUpperCase()) : undefined,
       coordinatorId,
+      clockifyEnabled,
       userName: session.name,
       userEmail: session.email,
       userPicture: session.picture
     });
 
     const finalUrl = new URL(redirectUrl, request.url);
-    if (redirectUrl === '/settings') finalUrl.searchParams.set('success', 'true');
+    const { addSyncLog } = await import('../../lib/logs');
+    if (redirectUrl === '/settings') {
+      let msg = 'Profile updated successfully';
+      if (formData.get('unlinkClockify') === 'true') {
+        msg = 'Clockify unlinked';
+        await addSyncLog({ userId: session.id, type: 'Mode', status: 'Warning', details: 'Clockify integration disabled' });
+      } else if (formData.get('linkClockify') === 'true') {
+        msg = 'Clockify linked successfully';
+        await addSyncLog({ userId: session.id, type: 'Sync', status: 'Success', details: 'Clockify integration enabled' });
+      } else if (formData.get('unlink') === 'true') {
+        msg = 'Unlinked from coordinator';
+        await addSyncLog({ userId: session.id, type: 'Mode', status: 'Warning', details: 'Unlinked from coordinator' });
+      } else if (formData.get('coordinatorInvite')) {
+        msg = 'Linked to coordinator successfully';
+        await addSyncLog({ userId: session.id, type: 'Mode', status: 'Success', details: 'Linked to a new coordinator' });
+      } else {
+        await addSyncLog({ userId: session.id, type: 'Settings', status: 'Success', details: 'Internship configuration updated' });
+      }
+      
+      finalUrl.searchParams.set('success', msg);
+    }
     return Response.redirect(finalUrl.toString(), 302);
   } catch (e) {
     console.error('Settings save error:', e);
-    const errorMsg = encodeURIComponent(e.message);
-    
-    // Try to get redirectUrl again for error redirect
-    let redirectUrl = '/dashboard';
-    try {
-      const freshFormData = await request.clone().formData();
-      redirectUrl = freshFormData.get('redirect') as string || '/dashboard';
-    } catch(err) {}
-
     const finalUrl = new URL(redirectUrl, request.url);
-    finalUrl.searchParams.set('error', errorMsg);
+    finalUrl.searchParams.set('error', e.message);
     return Response.redirect(finalUrl.toString(), 302);
   }
 };
