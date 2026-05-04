@@ -2,15 +2,19 @@ export function formatHMS(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
-  
-  return `${h}h ${m}m ${s}s`;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+export function formatHours(hours: number): string {
+  return formatHMS(Math.floor(hours * 3600));
 }
 
 export function formatTime(date: Date): string {
-  return date.toLocaleTimeString('en-US', {
-    hour: 'numeric',
+  return date.toLocaleTimeString('en-GB', {
+    hour: '2-digit',
     minute: '2-digit',
-    hour12: true,
+    second: '2-digit',
+    hour12: false,
     timeZone: 'Asia/Manila'
   });
 }

@@ -6,6 +6,7 @@ import { getSession } from '../lib/auth';
 import { parse } from 'cookie';
 import { getAppSettings } from '../lib/settings';
 import { supabase } from '../lib/supabase';
+import { formatHours } from '../lib/utils';
 
 const cookieHeader = Astro.request.headers.get('cookie') || '';
 const cookies = parse(cookieHeader);
@@ -149,7 +150,7 @@ const totalRenderedHours = studentStats.reduce((acc, s) => acc + s.renderedHours
                       </div>
                     </td>
                     <td><span class="program-tag">{s.host_company}</span></td>
-                    <td class="mono">{s.renderedHours.toFixed(2)} / {s.target_hours}h</td>
+                    <td class="mono">{formatHours(s.renderedHours)} / {formatHours(s.target_hours)}</td>
                     <td>
                       <div class="progress-col">
                         <span class="percent">{s.percent}%</span>

@@ -8,6 +8,7 @@ import { getManualEntries, addManualEntry, deleteManualEntry, updateManualEntry,
 import { getClockifyUser } from '../lib/clockify';
 
 import { getAppSettings } from '../lib/settings';
+import { formatHours, formatHMS } from '../lib/utils';
 
 const cookieHeader = Astro.request.headers.get('cookie') || '';
 const cookies = parse(cookieHeader);
@@ -102,12 +103,10 @@ const entries = await getManualEntries(user.id);
 const activeTimer = await getActiveTimer(user.id);
 const totalSeconds = entries.reduce((acc, e) => acc + e.durationSeconds, 0);
 
-const formatTo12hr = (timeStr: string) => {
+const formatTo24hr = (timeStr: string) => {
   if (!timeStr) return '';
-  const [h, m] = timeStr.split(':').map(Number);
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const hour = h % 12 || 12;
-  return `${hour}:${String(m).padStart(2, '0')} ${ampm}`;
+  const parts = timeStr.split(':').map(Number);
+  return parts.map(p => String(p).padStart(2, '0')).join(':');
 };
 ---
 
@@ -176,9 +175,8 @@ const formatTo12hr = (timeStr: string) => {
                     <div class="edit-start-box">
                       <label class="field-label">STARTED AT</label>
                       <input 
-                        type="time" 
-                        name="startTime" 
-                        class="inline-time-input"
+                        class="inline-time-input time-mask"
+                        maxlength="5"
                         value={new Date(activeTimer.startTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' })} 
                         onchange="document.getElementById('action-hidden').value='update-start'; this.form.submit();"
                       />
@@ -191,6 +189,7 @@ const formatTo12hr = (timeStr: string) => {
                   </div>
 
                   <input type="hidden" name="action" id="action-hidden" value={activeTimer ? "stop-timer" : "start-timer"} />
+                  <input type="hidden" name="id" id="id-hidden" />
 
                   <div class="button-box">
                     {activeTimer ? (
@@ -222,11 +221,11 @@ const formatTo12hr = (timeStr: string) => {
                         <div class="log-sub">
                           <span class="date">{new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Asia/Manila' })}</span>
                           <span class="dot">·</span>
-                          <span class="time">{formatTo12hr(entry.startTime)} — {formatTo12hr(entry.endTime)}</span>
+                          <span class="time">{formatTo24hr(entry.startTime)} — {formatTo24hr(entry.endTime)}</span>
                         </div>
                       </div>
                       <div class="log-actions">
-                        <span class="log-hours">{(entry.durationSeconds / 3600).toFixed(2)}h</span>
+                        <span class="log-hours">{formatHours(entry.durationSeconds / 3600)}</span>
                         <div class="action-group">
                           <button 
                             class="edit-icon" 
@@ -235,13 +234,13 @@ const formatTo12hr = (timeStr: string) => {
                           >
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                           </button>
-                          <form method="POST" onsubmit="return confirm('Delete this log permanently?')">
-                            <input type="hidden" name="action" value="delete" />
-                            <input type="hidden" name="id" value={entry.id} />
-                            <button type="submit" class="delete-icon" title="Remove Entry">
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                            </button>
-                          </form>
+                          <button 
+                            type="button"
+                            class="delete-icon" 
+                            onclick={`window.openDeleteModal('${entry.id}')`}
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -256,7 +255,7 @@ const formatTo12hr = (timeStr: string) => {
                 <div class="stats-box">
                   <div class="stat-item">
                     <span class="field-label">TOTAL RENDERED</span>
-                    <div class="stat-value">{(totalSeconds / 3600).toFixed(2)}<span class="stat-unit"> hrs</span></div>
+                    <div class="stat-value">{formatHours(totalSeconds / 3600)}</div>
                   </div>
                 </div>
 
@@ -274,14 +273,15 @@ const formatTo12hr = (timeStr: string) => {
                     </div>
                     <div class="input-row">
                       <div class="input-group">
-                        <label>Start</label>
-                        <input type="time" name="startTime" required />
+                        <label>Start (HH:mm)</label>
+                        <input type="text" name="startTime" placeholder="08:00" pattern="[0-9]{2}:[0-9]{2}" maxlength="5" class="time-mask" required />
                       </div>
                       <div class="input-group">
-                        <label>End</label>
-                        <input type="time" name="endTime" required />
+                        <label>End (HH:mm)</label>
+                        <input type="text" name="endTime" placeholder="17:00" pattern="[0-9]{2}:[0-9]{2}" maxlength="5" class="time-mask" required />
                       </div>
                     </div>
+                    <p class="input-hint">Use 24-hour format (e.g., 14:30 for 2:30 PM)</p>
                     <button type="submit" class="btn-outline">Add Entry</button>
                   </form>
                 </div>
@@ -314,14 +314,15 @@ const formatTo12hr = (timeStr: string) => {
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label>Start Time</label>
-                <input type="time" name="startTime" id="edit-start" required />
+                <label>Start Time (HH:mm)</label>
+                <input type="text" name="startTime" id="edit-start" placeholder="HH:mm" pattern="[0-9]{2}:[0-9]{2}" maxlength="5" class="time-mask" required />
               </div>
               <div class="form-group">
-                <label>End Time</label>
-                <input type="time" name="endTime" id="edit-end" required />
+                <label>End Time (HH:mm)</label>
+                <input type="text" name="endTime" id="edit-end" placeholder="HH:mm" pattern="[0-9]{2}:[0-9]{2}" maxlength="5" class="time-mask" required />
               </div>
             </div>
+            <p class="input-hint mt-8">Use 24-hour format (e.g., 14:30 for 2:30 PM)</p>
             
             <div class="modal-actions">
               <button type="button" class="btn-cancel" onclick="document.getElementById('edit-modal').style.display='none'">Cancel</button>
@@ -330,7 +331,22 @@ const formatTo12hr = (timeStr: string) => {
           </form>
         </div>
       </div>
-    </main>
+      <!-- Delete Confirmation Modal -->
+      <div id="delete-log-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+          <div class="modal-header-danger">
+            <div class="warning-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01"/></svg>
+            </div>
+            <h3>Delete log entry?</h3>
+          </div>
+          <p class="modal-desc">Are you sure you want to delete this record? This action cannot be undone.</p>
+          <div class="modal-actions-stacked">
+            <button type="button" class="btn-confirm-delete" onclick="window.confirmDelete()">Yes, Delete Log</button>
+            <button type="button" class="btn-cancel" onclick="document.getElementById('delete-log-modal').style.display='none'">Cancel</button>
+          </div>
+        </div>
+      </div>
   </div>
 </Layout>
 
@@ -364,14 +380,64 @@ const formatTo12hr = (timeStr: string) => {
     }
   }
 
-  window.openEditModal = (id, desc, date, start, end) => {
+  window.openEditModal = function(id, desc, date, start, end) {
     document.getElementById('edit-id').value = id;
     document.getElementById('edit-desc').value = desc;
     document.getElementById('edit-date').value = date;
     document.getElementById('edit-start').value = start;
     document.getElementById('edit-end').value = end;
     document.getElementById('edit-modal').style.display = 'flex';
-  };
+  }
+
+  let deleteTargetId = null;
+  window.openDeleteModal = function(id) {
+    deleteTargetId = id;
+    document.getElementById('delete-log-modal').style.display = 'flex';
+  }
+
+  window.confirmDelete = function() {
+    if (!deleteTargetId) return;
+    document.getElementById('action-hidden').value = 'delete';
+    document.getElementById('id-hidden').value = deleteTargetId;
+    document.getElementById('timer-main-form').submit();
+  }
+
+  // Time Masking Logic
+  document.addEventListener('input', (e) => {
+    if (e.target.classList.contains('time-mask')) {
+      let val = e.target.value.replace(/\D/g, '');
+      if (val.length > 4) val = val.slice(0, 4);
+      
+      // Auto-colon only for 4 digits as you type
+      if (val.length === 4) {
+        e.target.value = val.slice(0, 2) + ':' + val.slice(2);
+      } else {
+        e.target.value = val;
+      }
+    }
+  });
+
+  document.addEventListener('blur', (e) => {
+    if (e.target.classList.contains('time-mask')) {
+      let val = e.target.value.replace(/\D/g, '');
+      if (val.length === 3) {
+        // 800 -> 08:00
+        e.target.value = '0' + val[0] + ':' + val.slice(1);
+      } else if (val.length === 4) {
+        // 1200 -> 12:00
+        e.target.value = val.slice(0, 2) + ':' + val.slice(2);
+      }
+    }
+  }, true);
+
+  // Handle backspace
+  document.addEventListener('keydown', (e) => {
+    if (e.target.classList.contains('time-mask') && e.key === 'Backspace') {
+      if (e.target.value.includes(':') && e.target.value.length === 5) {
+         // Let normal backspace work
+      }
+    }
+  });
 </script>
 
 <style>
@@ -461,8 +527,23 @@ const formatTo12hr = (timeStr: string) => {
   .edit-icon:hover { color: var(--ntv-orange); }
 
   /* Modal Styles */
+  .input-hint { font-size: 11px; color: var(--text-secondary); opacity: 0.7; margin-top: 8px; }
+  .mt-8 { margin-top: 8px; }
   .modal-overlay { position: fixed; inset: 0; background: rgba(5, 11, 22, 0.85); backdrop-filter: blur(8px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
-  .modal-content { background: #0d1421; border: 1px solid rgba(237, 102, 33, 0.3); border-radius: 20px; width: 100%; max-width: 440px; padding: 32px; animation: modalIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .modal-content { background: #0d1421; border: 1px solid rgba(237, 102, 33, 0.3); border-radius: 20px; width: 100%; max-width: 440px; padding: 32px; animation: modalIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; position: relative; }
+  
+  .modal-header-danger { text-align: center; margin-bottom: 20px; }
+  .warning-icon { 
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 56px; height: 56px; background: rgba(239, 68, 68, 0.1);
+    color: #f87171; border-radius: 50%; margin-bottom: 16px;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+  }
+  .modal-desc { font-size: 14px; color: var(--text-secondary); text-align: center; line-height: 1.6; margin-bottom: 24px; }
+  .modal-actions-stacked { display: flex; flex-direction: column; gap: 10px; }
+  .btn-confirm-delete { width: 100%; padding: 12px; background: #ef4444; color: #fff; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .btn-confirm-delete:hover { filter: brightness(1.1); }
+  
   @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
   
   .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }

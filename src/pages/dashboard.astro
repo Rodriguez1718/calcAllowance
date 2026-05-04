@@ -7,7 +7,7 @@ import { parse } from 'cookie';
 import { getAppSettings, DEFAULT_SETTINGS } from '../lib/settings';
 import { getManualEntries } from '../lib/entries';
 import { getClockifyUser, getRenderedHours, getStudentProgress } from '../lib/clockify';
-import { formatHMS } from '../lib/utils';
+import { formatHMS, formatHours } from '../lib/utils';
 import { groupEntries } from '../lib/grouping';
 
 const cookieHeader = Astro.request.headers.get('cookie') || '';
@@ -262,7 +262,7 @@ const finishDateStr = estimatedFinishDate.toLocaleDateString('en-US', {
             <div class="metric-card">
               <div class="metric-info">
                 <span class="metric-label">Hours Rendered</span>
-                <div class="metric-value">{renderedHours.toFixed(2)} <span class="unit">/ {settings.targetHours}h</span></div>
+                <div class="metric-value">{formatHours(renderedHours)} <span class="unit">/ {formatHours(settings.targetHours)}</span></div>
               </div>
               <div class="metric-progress">
                 <div class="progress-track">
@@ -336,7 +336,7 @@ const finishDateStr = estimatedFinishDate.toLocaleDateString('en-US', {
                 <span class="summary-value">
                   {settings.hasAllowance 
                     ? `₱ ${totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                    : `${renderedHours.toFixed(2)} hrs`}
+                    : `${formatHours(renderedHours)}`}
                 </span>
               </div>
             </div>
@@ -345,12 +345,12 @@ const finishDateStr = estimatedFinishDate.toLocaleDateString('en-US', {
                 <div class="breakdown-item">
                   <div class="item-main">
                     <span class="item-label">{item.label}</span>
-                    <span class="item-hours">{item.rendered.toFixed(2)} hours rendered</span>
+                    <span class="item-hours">{formatHours(item.rendered)} rendered</span>
                   </div>
                   <div class="item-value">
                     {settings.hasAllowance 
                       ? `₱ ${item.earnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                      : `${item.rendered.toFixed(2)} hrs`}
+                      : `${formatHours(item.rendered)}`}
                   </div>
                 </div>
               ))}
