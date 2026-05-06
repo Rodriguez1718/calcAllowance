@@ -1,5 +1,6 @@
 ---
 import Toaster from "../components/Toaster.astro";
+import Analytics from "@vercel/analytics/astro";
 ---
 
 <!doctype html>
@@ -100,7 +101,7 @@ import Toaster from "../components/Toaster.astro";
     .mobile-only {
       display: flex;
     }
-    
+
     /* Ensure all main content areas are centered on mobile */
     [id="portal-main"] {
       padding: 24px 16px !important;
@@ -108,8 +109,11 @@ import Toaster from "../components/Toaster.astro";
       flex-direction: column !important;
       align-items: center !important;
     }
-    
-    [id$="-content"], .content-grid, .tracker-layout, .dtr-scroll-wrapper {
+
+    [id$="-content"],
+    .content-grid,
+    .tracker-layout,
+    .dtr-scroll-wrapper {
       width: 100% !important;
       max-width: 100% !important;
     }
