@@ -5,6 +5,7 @@ import Sidebar from '../components/Sidebar.astro';
 import { getSession } from '../lib/auth';
 import { parse } from 'cookie';
 import { getAppSettings } from '../lib/settings';
+import { formatHours } from '../lib/utils';
 
 const cookieHeader = Astro.request.headers.get('cookie') || '';
 const cookies = parse(cookieHeader);
@@ -261,7 +262,7 @@ const isLinked = settings.role === 'student' && !!settings.coordinatorId;
                 </div>
                 <div class="help-item">
                   <span class="help-label">Target Hours</span>
-                  <span class="help-value">{settings.targetHours.toFixed(2)}</span>
+                  <span class="help-value">{formatHours(settings.targetHours)}</span>
                 </div>
               </div>
             </section>

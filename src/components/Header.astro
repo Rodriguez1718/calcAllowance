@@ -171,10 +171,9 @@ const { user } = Astro.props;
 
   function tick() {
     const pht = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-    const h = pht.getHours(), m = String(pht.getMinutes()).padStart(2,'0'), s = String(pht.getSeconds()).padStart(2,'0');
-    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h = String(pht.getHours()).padStart(2,'0'), m = String(pht.getMinutes()).padStart(2,'0'), s = String(pht.getSeconds()).padStart(2,'0');
     const el = document.getElementById('live-clock');
-    if (el) el.textContent = `${String(h%12||12).padStart(2,'0')}:${m}:${s} ${ampm}`;
+    if (el) el.textContent = `${h}:${m}:${s}`;
   }
   tick(); setInterval(tick, 1000);
 </script>

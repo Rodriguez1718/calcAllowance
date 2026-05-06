@@ -26,7 +26,7 @@ export async function getManualEntries(userId: string): Promise<TimeEntry[]> {
       const start = new Date(e.start_time);
       const end = new Date(e.end_time);
       
-      const timeStr = (d: Date) => d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit' });
+      const timeStr = (d: Date) => d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', second: '2-digit' });
       const dateStr = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
 
       return {
@@ -49,8 +49,9 @@ export async function getManualEntries(userId: string): Promise<TimeEntry[]> {
 
 export async function addManualEntry(entry: { userId: string, description: string, date: string, startTime: string, endTime: string }) {
   // Combine date and time to create full timestamps in Philippine Time
-  const startStr = `${entry.date}T${entry.startTime}:00`;
-  const endStr = `${entry.date}T${entry.endTime}:00`;
+  const ensureSeconds = (t: string) => t.split(':').length === 2 ? `${t}:00` : t;
+  const startStr = `${entry.date}T${ensureSeconds(entry.startTime)}`;
+  const endStr = `${entry.date}T${ensureSeconds(entry.endTime)}`;
   
   // We handle these as local times for the user (Asia/Manila)
   const start = new Date(startStr);
@@ -77,8 +78,9 @@ export async function addManualEntry(entry: { userId: string, description: strin
 }
 
 export async function updateManualEntry(id: string, entry: { description: string, date: string, startTime: string, endTime: string }) {
-  const startStr = `${entry.date}T${entry.startTime}:00`;
-  const endStr = `${entry.date}T${entry.endTime}:00`;
+  const ensureSeconds = (t: string) => t.split(':').length === 2 ? `${t}:00` : t;
+  const startStr = `${entry.date}T${ensureSeconds(entry.startTime)}`;
+  const endStr = `${entry.date}T${ensureSeconds(entry.endTime)}`;
   
   const start = new Date(startStr);
   const end = new Date(endStr);
@@ -187,7 +189,8 @@ export async function updateTimerStart(userId: string, startTimeStr: string) {
   // startTimeStr is HH:mm
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
-  const fullStart = new Date(`${dateStr}T${startTimeStr}:00`);
+  const ensureSeconds = (t: string) => t.split(':').length === 2 ? `${t}:00` : t;
+  const fullStart = new Date(`${dateStr}T${ensureSeconds(startTimeStr)}`);
   
   const { error } = await supabase
     .from('active_timers')
