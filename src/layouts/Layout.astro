@@ -1,4 +1,5 @@
 ---
+import { ClientRouter } from "astro:transitions";
 import Toaster from "../components/Toaster.astro";
 ---
 
@@ -6,7 +7,7 @@ import Toaster from "../components/Toaster.astro";
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="generator" content={Astro.generator} />
     <meta
@@ -20,6 +21,19 @@ import Toaster from "../components/Toaster.astro";
       href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
+    <ClientRouter />
+    <script>
+      import { App } from '@capacitor/app';
+      
+      // Handle Android Hardware Back Button
+      App.addListener('backButton', ({ canGoBack }) => {
+        if (canGoBack) {
+          window.history.back();
+        } else {
+          App.exitApp();
+        }
+      });
+    </script>
   </head>
   <body>
     <div class="sidebar-overlay" id="global-overlay"></div>
